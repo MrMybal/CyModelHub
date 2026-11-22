@@ -17,8 +17,8 @@ node .CyDocBuild/build.mjs
 ```
 
 You can also pass an already built CyDoc checkout as the first argument to
-`build.mjs`. The script stages the four tracked screenshots from `docs/screenshots/` and
-exports the reader and CyDoc license to `Documentation/`. To run CyDoc's `check` command,
+`build.mjs`. The script stages the tracked screenshots and application icon, then exports
+the reader and CyDoc license to `Documentation/`. To run CyDoc's `check` command,
 pass the CyDoc directory followed by `check`. Both commands write the export.
 
 Open `Documentation/Documentation.html` from disk, verify both languages and include the

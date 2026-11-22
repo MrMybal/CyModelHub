@@ -85,7 +85,7 @@ function(cymodelhub_configure target)
     if(MSVC)
         target_compile_options(${target} PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:/utf-8;/W4;/permissive-;/EHsc>")
     else()
-        target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(${target} PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:-Wall;-Wextra;-Wpedantic>")
     endif()
 endfunction()
 
@@ -168,16 +168,33 @@ if(CYMODELHUB_BUILD_APP)
         target_link_libraries(CyModelHub PRIVATE SDL3::SDL3)
     endif()
     cymodelhub_configure(CyModelHub)
+    set(branding_dir "${CMAKE_CURRENT_SOURCE_DIR}/assets/branding")
+    set(logo_png "${branding_dir}/cymodelhub-icon.png")
+    set(app_branding_dir "$<TARGET_FILE_DIR:CyModelHub>/assets/branding")
+    if(WIN32)
+        enable_language(RC)
+        set(icon_resource "${branding_dir}/cymodelhub.rc")
+        set_source_files_properties("${icon_resource}" PROPERTIES
+            OBJECT_DEPENDS "${branding_dir}/cymodelhub.ico")
+        target_sources(CyModelHub PRIVATE "${icon_resource}")
+        target_include_directories(CyModelHub PRIVATE "${branding_dir}")
+    endif()
     if(APPLE)
+        set(icon_bundle "${branding_dir}/cymodelhub.icns")
+        set_source_files_properties("${icon_bundle}" PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+        target_sources(CyModelHub PRIVATE "${icon_bundle}")
         set_target_properties(CyModelHub PROPERTIES MACOSX_BUNDLE_GUI_IDENTIFIER com.cyberalien.cymodelhub
             MACOSX_BUNDLE_BUNDLE_NAME CyModelHub MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
-            MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}")
+            MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}" MACOSX_BUNDLE_ICON_FILE cymodelhub.icns)
+        set(app_branding_dir "$<TARGET_BUNDLE_CONTENT_DIR:CyModelHub>/Resources/assets/branding")
     endif()
     set(manual_dir "${CMAKE_CURRENT_SOURCE_DIR}/Documentation")
-    add_custom_target(CyModelHub_manual
+    add_custom_target(CyModelHub_assets
         COMMAND ${CMAKE_COMMAND} -E copy_directory "${manual_dir}" "$<TARGET_FILE_DIR:CyModelHub>/Documentation"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${app_branding_dir}"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${logo_png}" "${app_branding_dir}"
         VERBATIM)
-    add_dependencies(CyModelHub CyModelHubService CyModelHubMcp CyModelHub_manual)
+    add_dependencies(CyModelHub CyModelHubService CyModelHubMcp CyModelHub_assets)
 
     # Interface languages are plain JSON files next to the executable: add a file to add a language.
     add_custom_command(TARGET CyModelHub POST_BUILD
@@ -212,6 +229,7 @@ if(CYMODELHUB_BUILD_APP)
         install(DIRECTORY "${manual_dir}" DESTINATION "CyModelHub.app/Contents/Resources" COMPONENT Hub)
     endif()
     install(DIRECTORY "${manual_dir}" docs DESTINATION . COMPONENT Hub)
+    install(FILES "${logo_png}" DESTINATION assets/branding COMPONENT Hub)
     install(DIRECTORY locales DESTINATION . COMPONENT Hub)
     install(DIRECTORY "$<TARGET_FILE_DIR:CyModelHub>/licenses" DESTINATION . COMPONENT Hub)
     install(FILES LICENSE LICENSE-MIT README.md README.fr.md BUILD.md VERSION.md VERSION.fr.md DESTINATION .

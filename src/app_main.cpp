@@ -61,6 +61,12 @@ void run(const Arguments& arguments) {
         SDL_CreateWindow("CyModelHub", 1360, 840, SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_HIDDEN),
         SDL_DestroyWindow);
     if (!window) throw std::runtime_error(SDL_GetError());
+    if (const auto* base = SDL_GetBasePath()) {
+        const auto icon_path = std::string(base) + "assets/branding/cymodelhub-icon.png";
+        std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> icon(
+            SDL_LoadPNG(icon_path.c_str()), SDL_DestroySurface);
+        if (icon) SDL_SetWindowIcon(window.get(), icon.get());
+    }
     SDL_SetWindowMinimumSize(window.get(), 960, 600);
     std::unique_ptr<SDL_Renderer, decltype(&SDL_DestroyRenderer)> renderer(SDL_CreateRenderer(window.get(), nullptr),
                                                                            SDL_DestroyRenderer);

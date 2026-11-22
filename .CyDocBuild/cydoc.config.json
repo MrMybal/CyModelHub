@@ -1,6 +1,7 @@
 {
   "$comment": "SPDX-License-Identifier: GPL-3.0-only",
   "name": "CyModelHub",
+  "logo": "assets/cymodelhub-icon.png",
   "version": "0.1.0",
   "defaultLocale": "en",
   "locales": [

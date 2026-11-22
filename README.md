@@ -10,6 +10,7 @@
       <a href="README.md">English</a> · <a href="README.fr.md">Français</a>
     </td>
     <td width="400" align="center" valign="middle">
+      <img src="assets/branding/cymodelhub-icon.png" width="112" alt="CyModelHub logo"><br>
       <h1>CyModelHub</h1>
     </td>
     <td width="300" align="right" valign="top">
