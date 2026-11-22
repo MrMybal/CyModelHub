@@ -1,0 +1,54 @@
+// SPDX-FileCopyrightText: 2026 Cyberalien
+// SPDX-License-Identifier: MIT
+
+#pragma once
+
+#include <cymcp/core.hpp>
+#include <cstdint>
+#include <optional>
+
+namespace modelhub {
+namespace fs = std::filesystem;
+using cymcp::Json;
+
+inline constexpr int default_service_port = 48787;
+
+fs::path from_utf8(std::string_view value);
+std::string to_utf8(const fs::path& path);
+std::string lower(std::string value); // ASCII only
+// Text coming from the operating system (error messages, exception texts) as valid UTF-8.
+// On Windows such text is in the system code page; elsewhere invalid bytes are replaced.
+std::string system_text(std::string_view text);
+std::string environment(const char* name);
+void set_environment(const char* name, const std::string& value);
+fs::path home_path();
+// Per-user data directory. CYMODELHUB_DATA overrides it (tests, portable installs).
+fs::path data_path();
+fs::path descriptor_path(); // <data>/service.json: how a local application reaches the service
+fs::path executable_path();
+unsigned long process_id();
+std::int64_t now_seconds();
+std::int64_t file_time_seconds(const fs::file_time_type& time);
+
+// Whole file, or nullopt when it is missing, unreadable or larger than the limit.
+std::optional<std::string> read_file(const fs::path& path, std::size_t max_bytes = 64 * 1024 * 1024);
+// Write to a temporary sibling, then replace the destination in one step.
+void write_file_atomic(const fs::path& path, std::string_view content, bool owner_only = false);
+// True when another program already listens on this loopback TCP port. Windows lets two
+// programs share a listening port, so a server must check before it claims a fixed one.
+bool loopback_port_taken(int port);
+// Start a program that outlives the caller, without a console window.
+bool spawn_detached(const fs::path& executable, const std::vector<std::string>& arguments);
+
+// Exclusive, process-lifetime lock used to keep a single service per data directory.
+class FileLock {
+    std::intptr_t handle_ = -1;
+
+  public:
+    explicit FileLock(const fs::path& path);
+    ~FileLock();
+    FileLock(const FileLock&) = delete;
+    FileLock& operator=(const FileLock&) = delete;
+    bool held() const { return handle_ != -1; }
+};
+} // namespace modelhub
