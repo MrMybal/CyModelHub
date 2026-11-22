@@ -16,7 +16,7 @@
     <td width="300" align="right" valign="top">
       <p><sub>License</sub><br><a href="LICENSE"><strong>GPL-3.0-only</strong></a><br><sub>client library: <a href="LICENSE-MIT">MIT</a></sub></p>
       <p><sub>Version</sub><br><a href="VERSION.md"><strong>0.1.1</strong></a><br><strong>IN DEVELOPMENT</strong></p>
-      <p><sub>Verified platform</sub><br><a href="https://github.com/MrMybal/CyModelHub/releases/tag/v0.1.0">Windows x64 download</a></p>
+      <p><sub>Verified platform</sub><br><a href="https://github.com/MrMybal/CyModelHub/releases/latest">Windows x64 download</a></p>
     </td>
   </tr>
 </table>
@@ -159,16 +159,16 @@ file next to the others: it appears in **Settings → Language**.
 
 ## Installation
 
-Download the Windows x64 ZIP from [release 0.1.0](https://github.com/MrMybal/CyModelHub/releases/tag/v0.1.0),
-extract the whole folder and run `CyModelHub.exe`. The service starts when needed. Open
+Download and run the Windows x64 installer from the [latest release](https://github.com/MrMybal/CyModelHub/releases/latest).
+The installer sets up CyModelHub for the current user and creates a Start menu shortcut.
+The service starts when needed. Open
 **Settings** from the CyModelHub icon in the Windows notification area to go straight to the
 settings. Press **F1** or choose **Settings → User manual (F1)**
 to open the bilingual offline manual. You can also open
 [Documentation.html](Documentation/Documentation.html#/en/overview) from a local copy of the
 repository or the installed folder. Keep `DocData` beside the HTML file.
 
-Starting with 0.1.1, the Windows x64 installer installs CyModelHub for the current user
-and creates a Start menu shortcut. If you are using 0.1.0, quit it from the notification
+If you are using the portable 0.1.0 build, quit it from the notification
 area and run `CyModelHubCli stop` after any jobs finish, then run the installer.
 In 0.1.1 or later, open **Settings → Application updates → Check for updates** to find
 newer installers on GitHub. CyModelHub checks the download against GitHub’s SHA-256

@@ -16,7 +16,7 @@
     <td width="300" align="right" valign="top">
       <p><sub>Licence</sub><br><a href="LICENSE"><strong>GPL-3.0-only</strong></a><br><sub>bibliothèque cliente : <a href="LICENSE-MIT">MIT</a></sub></p>
       <p><sub>Version</sub><br><a href="VERSION.fr.md"><strong>0.1.1</strong></a><br><strong>EN DÉVELOPPEMENT</strong></p>
-      <p><sub>Plateforme vérifiée</sub><br><a href="https://github.com/MrMybal/CyModelHub/releases/tag/v0.1.0">Télécharger pour Windows x64</a></p>
+      <p><sub>Plateforme vérifiée</sub><br><a href="https://github.com/MrMybal/CyModelHub/releases/latest">Télécharger pour Windows x64</a></p>
     </td>
   </tr>
 </table>
@@ -169,16 +169,16 @@ déposez le fichier à côté des autres : il apparaît dans **Réglages → Lan
 
 ## Installation
 
-Téléchargez le ZIP Windows x64 de la [version 0.1.0](https://github.com/MrMybal/CyModelHub/releases/tag/v0.1.0),
-extrayez tout le dossier et lancez `CyModelHub.exe`. Le service démarre au besoin. L’icône
+Téléchargez et lancez l’installateur Windows x64 de la [dernière version](https://github.com/MrMybal/CyModelHub/releases/latest).
+Il installe CyModelHub pour l’utilisateur courant et crée un raccourci dans le menu Démarrer.
+Le service démarre au besoin. L’icône
 CyModelHub dans la zone de notification Windows donne accès aux **Réglages**.
 Appuyez sur **F1** ou choisissez
 **Réglages → Manuel utilisateur (F1)** pour consulter le manuel bilingue hors ligne.
 Vous pouvez aussi ouvrir [Documentation.html](Documentation/Documentation.html#/fr/overview)
 depuis une copie locale du dépôt ou du dossier installé. Laissez `DocData` à côté du fichier HTML.
 
-À partir de la 0.1.1, l’installateur Windows x64 installe CyModelHub pour l’utilisateur
-courant et crée un raccourci dans le menu Démarrer. Si vous utilisez la 0.1.0, quittez-la
+Si vous utilisez la version portable 0.1.0, quittez-la
 depuis la zone de notification, attendez la fin des tâches et lancez `CyModelHubCli stop`
 avant d’ouvrir l’installateur. À partir de la 0.1.1, ouvrez **Réglages → Mises à jour de
 l’application → Vérifier les mises à jour** pour trouver les installateurs récents sur
