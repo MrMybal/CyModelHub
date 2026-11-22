@@ -173,8 +173,8 @@ int main() {
     check(fails(*registry, "install_start", {{"url", "https://example.com/m.gguf"},
                                              {"destination", to_utf8(root / "elsewhere")}}, "OutsideLocations"),
           "download outside the locations refused");
-    const auto bad = wait(*hub, registry->invoke("install_start", {{"url", "https://example.com/setup.exe"}}).at("job"));
-    check(bad.at("state") == "failed", "download of a non-model file refused");
+    check(fails(*registry, "install_start", {{"url", "https://example.com/setup.exe"}}, "InvalidName"),
+          "download of a non-model file refused");
 
     // The catalogue is reloaded from disk as it was.
     const auto before = registry->invoke("models_list", {{"limit", 500}}).at("total");

@@ -926,7 +926,7 @@ struct Ui::Impl {
             cyui::textDim("%s", job->value("message", std::string()).c_str());
             ImGui::TableNextColumn();
             if (state == "running" && cyui::iconButton(icon::close, T("Cancel").c_str()))
-                invoke("", "jobs_cancel", {{"id", id}});
+                invoke("", "jobs_cancel", {{"id", id}, {"force", true}});
         }
         ImGui::EndTable();
     }

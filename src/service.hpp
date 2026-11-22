@@ -4,6 +4,7 @@
 #pragma once
 
 #include "catalog.hpp"
+#include "coordination.hpp"
 #include "jobs.hpp"
 
 namespace modelhub {
@@ -11,7 +12,9 @@ namespace modelhub {
 struct Hub {
     fs::path data_directory;
     Catalog catalog;
-    Jobs jobs; // declared after the catalogue: jobs stop before the catalogue goes away
+    Ledger ledger;             // what each idempotency key did
+    Reservations reservations; // one installation per artifact
+    Jobs jobs;                 // declared last: jobs stop before what they use goes away
     std::atomic_bool shutdown{false};
 
     explicit Hub(fs::path directory);

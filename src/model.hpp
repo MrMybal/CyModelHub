@@ -25,10 +25,22 @@ struct Model {
     // Fields edited by the user. A scan never overwrites them.
     std::vector<std::string> locked;
     Json metadata = Json::object();
+    // What was installed or registered: the identity of the request (see install_start), the
+    // revision of the source and the variant, so that the same model is recognised again.
+    std::string artifact, revision, variant;
+    // Complete model made of several files (see package.hpp). Null for a plain file or folder.
+    Json package;
+    // Last integrity check: state (ready, incomplete, invalid), integrity (sizes, recorded,
+    // verified), and the size and time the content had then. Null when never checked.
+    Json validation;
 
     Json to_json(bool details) const;
     static Model from_json(const Json& value);
     bool is_locked(std::string_view field) const;
+    // missing; ready, incomplete or invalid after a check; "present" when it was only seen.
+    std::string state() const;
+    // none, sizes, recorded (hashes computed here) or verified (hashes matched expected ones).
+    std::string integrity() const;
 };
 
 struct Filter {

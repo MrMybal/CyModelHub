@@ -4,6 +4,7 @@
       <a href="Documentation/Documentation.html#/en/overview">User manual</a><br>
       <a href="BUILD.md">Build</a><br>
       <a href="docs/API.md">Service operations</a><br>
+      <a href="docs/INTEGRATION.md">Application integration</a><br>
       <a href="VERSION.md">Release notes</a><br><br>
       <sub>README</sub><br>
       <a href="README.md">English</a> · <a href="README.fr.md">Français</a>
@@ -44,6 +45,11 @@ and storing its own copy.
   or symbolic link, without copying it.
 - **Installs models.** From a Hugging Face repository or an HTTPS address, with progress,
   resume and SHA-256 verification.
+- **Shares one installation between applications.** Several programs that ask for the same
+  model at the same moment get one download and one copy; a request sent twice has one effect.
+- **Knows complete models.** A model made of several files (weights, shards, configuration,
+  tokenizer, manifest) is announced ready only when every required file is there and checked.
+  An application can also register, where it is, a model it downloaded itself.
 - **Works with AI assistants.** Every operation is also an MCP tool.
 
 CyModelHub never deletes a model file. It only writes inside the locations you registered.
@@ -87,6 +93,33 @@ library, the operating system and the copy of [nlohmann/json](https://github.com
 defines the `nlohmann_json::nlohmann_json` target before it adds CyModelHub, that copy is used
 instead. A complete example is in [examples/client](examples/client). The service is found
 through `CYMODELHUB_SERVICE`, next to your program, or where it last ran.
+
+### One exact model
+
+`resolve()` finds the closest name, which suits a person. An application that needs one exact
+model uses the strict path: it says which model, what it must be and which files it opens, and
+gets an explicit answer instead of a look-alike.
+
+```cpp
+cymodelhub::Requirement need;
+need.repository = "org/name";
+need.revision   = "<commit>";
+need.files      = {{"model.gguf", 4368439584, "<sha256>"}};
+
+auto found = hub.check(need);
+if (found.ready())
+    load(found.entry);                          // the shared file: never copy it
+else if (found.status == cymodelhub::Availability::absent ||
+         found.status == cymodelhub::Availability::installing)
+    load(hub.wait(hub.install(request)).path);  // joins an installation already in progress
+else
+    report(found.status_name, found.reasons);   // incomplete, invalid, incompatible, ambiguous...
+```
+
+[Application integration](docs/INTEGRATION.md) describes the whole path: strict resolution,
+complete models, joining an installation, registering a model the application downloaded,
+requests that may be sent twice, and what each answer means.
+[examples/client/ensure_model.cpp](examples/client/ensure_model.cpp) is that path as a program.
 
 Any language can talk to the service directly: read `service.json` in the CyModelHub data
 folder (`url`, `token`), then `POST <url>/v1` with `Authorization: Bearer <token>` and

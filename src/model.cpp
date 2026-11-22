@@ -57,8 +57,16 @@ Json Model::to_json(bool details) const {
                   {"source", source},
                   {"root", root},
                   {"repo", repo},
+                  {"revision", revision},
+                  {"variant", variant},
+                  {"artifact", artifact},
+                  {"state", state()},
+                  {"integrity", integrity()},
+                  {"complete", package.is_object()},
                   {"tags", tags}};
     if (details) {
+        if (package.is_object()) value["package"] = package;
+        if (validation.is_object()) value["validation"] = validation;
         value["url"] = url;
         value["classifiedBy"] = classified_by;
         value["notes"] = notes;
@@ -98,11 +106,27 @@ Model Model::from_json(const Json& value) {
     model.locked = strings(value, "locked");
     if (const auto found = value.find("metadata"); found != value.end() && found->is_object())
         model.metadata = *found;
+    model.artifact = text(value, "artifact");
+    model.revision = text(value, "revision");
+    model.variant = text(value, "variant");
+    if (const auto found = value.find("package"); found != value.end() && found->is_object())
+        model.package = *found;
+    if (const auto found = value.find("validation"); found != value.end() && found->is_object())
+        model.validation = *found;
     return model;
 }
 
 bool Model::is_locked(std::string_view field) const {
     return std::find(locked.begin(), locked.end(), field) != locked.end();
+}
+
+std::string Model::state() const {
+    if (missing) return "missing";
+    return validation.is_object() ? text(validation, "state", "present") : "present";
+}
+
+std::string Model::integrity() const {
+    return validation.is_object() ? text(validation, "integrity", "none") : "none";
 }
 
 std::string path_key(const fs::path& path) {

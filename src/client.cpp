@@ -4,7 +4,9 @@
 #include <cymodelhub/client.hpp>
 
 #include "platform.hpp"
+#include <algorithm>
 #include <mutex>
+#include <random>
 #include <thread>
 
 namespace cymodelhub {
@@ -19,7 +21,72 @@ std::string text(const Json& value, const char* key) {
 void set(Json& arguments, const char* key, const std::string& value) {
     if (!value.empty()) arguments[key] = value;
 }
+
+Json files_json(const std::vector<ModelFile>& files, bool contract) {
+    Json list = Json::array();
+    for (const auto& file : files) {
+        Json item = {{"path", file.path}};
+        if (file.size) item["size"] = *file.size;
+        set(item, "sha256", file.sha256);
+        if (contract) {
+            set(item, "role", file.role);
+            if (!file.required) item["required"] = false;
+        }
+        list.push_back(std::move(item));
+    }
+    return list;
+}
+
+// Operations that only read, or that have the same effect however often they are sent.
+bool repeatable(const std::string& operation, const Json& arguments) {
+    static constexpr const char* safe[] = {
+        "hub_status",        "models_list",  "models_get",  "models_resolve", "models_facets",
+        "models_duplicates", "models_check", "roots_list",  "jobs_list",      "jobs_get",
+        "installs_list",     "hub_shutdown", "jobs_cancel", "install_leave"};
+    if (std::any_of(std::begin(safe), std::end(safe), [&](const char* name) { return operation == name; }))
+        return true;
+    const auto key = arguments.is_object() ? arguments.find("idempotencyKey") : arguments.end();
+    return arguments.is_object() && key != arguments.end() && key->is_string() &&
+           !key->get<std::string>().empty();
+}
+
+Installation installation_from_json(Json answer, std::string key) {
+    Installation installation;
+    installation.job = text(answer, "job");
+    installation.ticket = text(answer, "ticket");
+    installation.artifact = text(answer, "artifact");
+    installation.idempotency_key = std::move(key);
+    installation.joined = answer.value("joined", false);
+    installation.resumed = answer.value("resumed", false);
+    installation.installed = answer.value("installed", false);
+    installation.replayed = answer.value("replayed", false);
+    installation.destination_honored = answer.value("destinationHonored", true);
+    installation.destination = modelhub::from_utf8(text(answer, "destination"));
+    installation.raw = std::move(answer);
+    return installation;
+}
 } // namespace
+
+Json Package::to_json() const {
+    Json package = {{"files", files_json(files, true)}};
+    const auto group = [&](const char* name,
+                           std::initializer_list<std::pair<const char*, const std::string*>> fields) {
+        Json object = Json::object();
+        for (const auto& [key, value] : fields) set(object, key, *value);
+        if (!object.empty()) package[name] = std::move(object);
+    };
+    group("identity",
+          {{"name", &name}, {"repository", &repository}, {"revision", &revision}, {"variant", &variant}});
+    group("provenance", {{"source", &source}, {"url", &url}, {"application", &application}});
+    group("classification", {{"format", &format},
+                             {"type", &type},
+                             {"modality", &modality},
+                             {"architecture", &architecture},
+                             {"quantization", &quantization}});
+    set(package, "entry", entry);
+    if (dependencies.is_array() && !dependencies.empty()) package["dependencies"] = dependencies;
+    return package;
+}
 
 Model model_from_json(const Json& value) {
     Model model;
@@ -34,6 +101,11 @@ Model model_from_json(const Json& value) {
     model.source = text(value, "source");
     model.repository = text(value, "repo");
     model.sha256 = text(value, "sha256");
+    model.revision = text(value, "revision");
+    model.variant = text(value, "variant");
+    model.state = text(value, "state");
+    model.integrity = text(value, "integrity");
+    model.complete = value.value("complete", false);
     if (const auto tags = value.find("tags"); tags != value.end() && tags->is_array())
         for (const auto& tag : *tags)
             if (tag.is_string()) model.tags.push_back(tag.get<std::string>());
@@ -128,7 +200,8 @@ struct Client::Impl {
         throw Error("ServiceUnavailable", "The CyModelHub service did not answer in time");
     }
 
-    Json post(const Json& body) {
+    // `again`: sending the request a second time cannot repeat an effect.
+    Json post(const Json& body, bool again) {
         // A restarted service changes its address or token: reconnect once, then give up.
         for (int attempt = 0;; ++attempt) {
             modelhub::LocalRequest request;
@@ -147,7 +220,10 @@ struct Client::Impl {
             try {
                 response = modelhub::local_http(request);
             } catch (const modelhub::Failure& error) {
-                if (attempt == 0 && (error.code == "NetworkError" || error.code == "Timeout")) {
+                // A request that never left can always be sent again. One that left may have
+                // been carried out although its answer was lost.
+                if (attempt == 0 && (error.code == "NetworkError" || error.code == "Timeout") &&
+                    (again || !error.request_sent)) {
                     std::lock_guard lock(mutex);
                     url.clear();
                     continue;
@@ -198,10 +274,120 @@ std::string Client::endpoint() const {
 }
 
 Json Client::invoke(const std::string& operation, const Json& arguments) {
-    return impl_->post({{"method", "invoke"}, {"name", operation}, {"arguments", arguments}});
+    return impl_->post({{"method", "invoke"}, {"name", operation}, {"arguments", arguments}},
+                       repeatable(operation, arguments));
 }
 
-Json Client::describe() { return impl_->post({{"method", "describe"}}); }
+Json Client::describe() { return impl_->post({{"method", "describe"}}, true); }
+
+std::string Client::new_idempotency_key() {
+    static constexpr char digits[] = "0123456789abcdef";
+    std::random_device random;
+    std::string key = "k";
+    for (int index = 0; index < 8; ++index) {
+        auto value = random();
+        for (int nibble = 0; nibble < 4; ++nibble, value >>= 4) key += digits[value & 15];
+    }
+    return key;
+}
+
+Resolution Client::check(const Requirement& requirement) {
+    Json arguments = Json::object();
+    for (const auto& [key, value] :
+         {std::pair{"id", &requirement.id}, std::pair{"repository", &requirement.repository},
+          std::pair{"name", &requirement.name}, std::pair{"file", &requirement.file},
+          std::pair{"sha256", &requirement.sha256}, std::pair{"revision", &requirement.revision},
+          std::pair{"variant", &requirement.variant}, std::pair{"format", &requirement.format},
+          std::pair{"architecture", &requirement.architecture},
+          std::pair{"quantization", &requirement.quantization}, std::pair{"type", &requirement.type},
+          std::pair{"modality", &requirement.modality}, std::pair{"integrity", &requirement.integrity}})
+        set(arguments, key, *value);
+    if (!requirement.files.empty()) arguments["files"] = files_json(requirement.files, false);
+    auto answer = invoke("models_check", arguments);
+    Resolution resolution;
+    resolution.status_name = text(answer, "status");
+    static constexpr std::pair<const char*, Availability> names[] = {
+        {"ready", Availability::ready},
+        {"absent", Availability::absent},
+        {"installing", Availability::installing},
+        {"incomplete", Availability::incomplete},
+        {"invalid", Availability::invalid},
+        {"unverified", Availability::unverified},
+        {"incompatible", Availability::incompatible},
+        {"ambiguous", Availability::ambiguous}};
+    // A status this library does not know yet must never read as "ready".
+    resolution.status = Availability::invalid;
+    for (const auto& [name, status] : names)
+        if (resolution.status_name == name) resolution.status = status;
+    if (const auto model = answer.find("model"); model != answer.end() && model->is_object())
+        resolution.model = model_from_json(*model);
+    resolution.path = modelhub::from_utf8(text(answer, "path"));
+    resolution.root = modelhub::from_utf8(text(answer, "root"));
+    resolution.entry = modelhub::from_utf8(text(answer, "entry"));
+    resolution.job = text(answer, "job");
+    if (const auto reasons = answer.find("reasons"); reasons != answer.end() && reasons->is_array())
+        for (const auto& reason : *reasons)
+            if (reason.is_string()) resolution.reasons.push_back(reason.get<std::string>());
+    resolution.problems = answer.value("problems", Json::array());
+    resolution.candidates = answer.value("candidates", Json::array());
+    resolution.raw = std::move(answer);
+    return resolution;
+}
+
+Installation Client::install(InstallRequest request) {
+    if (request.idempotency_key.empty()) request.idempotency_key = new_idempotency_key();
+    Json arguments = {{"idempotencyKey", request.idempotency_key}};
+    set(arguments, "url", request.url);
+    set(arguments, "repository", request.repository);
+    set(arguments, "file", request.file);
+    set(arguments, "revision", request.revision);
+    set(arguments, "variant", request.variant);
+    set(arguments, "sha256", request.sha256);
+    set(arguments, "baseUrl", request.base_url);
+    set(arguments, "filename", request.filename);
+    set(arguments, "token", request.token);
+    if (!request.destination.empty()) arguments["destination"] = modelhub::to_utf8(request.destination);
+    if (request.package) arguments["package"] = request.package->to_json();
+    return installation_from_json(invoke("install_start", arguments), std::move(request.idempotency_key));
+}
+
+Installation Client::register_model(const std::filesystem::path& root, const Package& package, bool hashes,
+                                    std::string idempotency_key) {
+    if (idempotency_key.empty()) idempotency_key = new_idempotency_key();
+    const Json arguments = {{"idempotencyKey", idempotency_key},
+                            {"root", modelhub::to_utf8(std::filesystem::absolute(root))},
+                            {"package", package.to_json()},
+                            {"verify", hashes ? "hashes" : "sizes"}};
+    return installation_from_json(invoke("models_register", arguments), std::move(idempotency_key));
+}
+
+Installation Client::verify(const std::string& id, bool hashes) {
+    auto key = new_idempotency_key();
+    const Json arguments = {{"idempotencyKey", key}, {"id", id}, {"level", hashes ? "hashes" : "sizes"}};
+    return installation_from_json(invoke("models_verify", arguments), std::move(key));
+}
+
+Model Client::wait(const Installation& installation, std::chrono::milliseconds timeout,
+                   const std::function<void(const Json&)>& progress) {
+    const auto job = wait_job(installation.job, timeout, progress);
+    const auto state = text(job, "state");
+    if (state != "done") {
+        auto code = text(job, "code");
+        if (code.empty())
+            code = state == "cancelled" ? "Cancelled" : state == "interrupted" ? "Interrupted" : "JobFailed";
+        throw Error(code, text(job, "message").empty() ? "The job did not complete" : text(job, "message"));
+    }
+    const auto result = job.find("result");
+    if (result == job.end() || !result->is_object() || !result->contains("model"))
+        throw Error("JobFailed", "The job gave no model");
+    return model_from_json(result->at("model"));
+}
+
+bool Client::leave(const Installation& installation) {
+    if (installation.ticket.empty()) return false;
+    return invoke("install_leave", {{"job", installation.job}, {"ticket", installation.ticket}})
+        .value("cancelled", false);
+}
 
 std::vector<Model> Client::list(const Query& query, std::size_t* total) {
     Json arguments = {{"sort", query.sort}, {"descending", query.descending}, {"offset", query.offset},

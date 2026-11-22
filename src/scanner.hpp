@@ -23,4 +23,7 @@ fs::path managed_store();
 std::vector<Model> scan_root(const Root& root, const ScanContext& context);
 // One file or one model folder, for manual additions. nullopt when nothing usable is there.
 std::optional<Model> describe_path(const fs::path& path, const ScanContext& context = {});
+// Any folder as one model, whether its layout is recognised or not: sizes, file count and
+// whatever classification its files allow. Used for complete models declared by a contract.
+Model describe_tree(const fs::path& folder, const ScanContext& context = {});
 } // namespace modelhub

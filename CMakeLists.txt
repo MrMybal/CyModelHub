@@ -113,7 +113,8 @@ cymodelhub_configure(cymodelhub_client)
 
 if(CYMODELHUB_BUILD_SERVICE)
     add_library(modelhub_core STATIC src/model.cpp src/formats.cpp src/scanner.cpp src/catalog.cpp
-        src/jobs.cpp src/install.cpp src/files.cpp src/service.cpp src/resident.cpp)
+        src/jobs.cpp src/install.cpp src/files.cpp src/package.cpp src/coordination.cpp src/installs.cpp
+        src/service.cpp src/resident.cpp)
     target_link_libraries(modelhub_core PUBLIC CyMCP::MCP modelhub_platform)
     cymodelhub_configure(modelhub_core)
 
@@ -227,6 +228,13 @@ if(CYMODELHUB_BUILD_TESTS)
         add_test(NAME core COMMAND modelhub_core_tests)
         set_tests_properties(core PROPERTIES TIMEOUT 120)
 
+        add_executable(modelhub_complete_tests tests/complete.cpp)
+        target_link_libraries(modelhub_complete_tests PRIVATE modelhub_core)
+        target_include_directories(modelhub_complete_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+        cymodelhub_configure(modelhub_complete_tests)
+        add_test(NAME complete COMMAND modelhub_complete_tests)
+        set_tests_properties(complete PROPERTIES TIMEOUT 180)
+
         add_executable(modelhub_client_tests tests/client.cpp)
         target_link_libraries(modelhub_client_tests PRIVATE cymodelhub_client modelhub_platform CyMCP::MCP)
         target_include_directories(modelhub_client_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
@@ -250,6 +258,12 @@ if(CYMODELHUB_BUILD_TESTS)
             add_test(NAME download COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/download.py"
                 "$<TARGET_FILE:CyModelHubCli>" "$<TARGET_FILE:CyModelHubService>")
             set_tests_properties(download PROPERTIES TIMEOUT 180)
+            add_test(NAME installs COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/installs.py"
+                "$<TARGET_FILE:CyModelHubCli>" "$<TARGET_FILE:CyModelHubService>")
+            set_tests_properties(installs PROPERTIES TIMEOUT 300)
+            add_test(NAME retry COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/retry.py"
+                "$<TARGET_FILE:CyModelHubCli>")
+            set_tests_properties(retry PROPERTIES TIMEOUT 120)
         endif()
     endif()
 endif()

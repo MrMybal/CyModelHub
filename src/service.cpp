@@ -3,6 +3,8 @@
 
 #include "service.hpp"
 #include "files.hpp"
+#include "installs.hpp"
+#include "package.hpp"
 #include "scanner.hpp"
 
 #include <algorithm>
@@ -32,31 +34,6 @@ const Json output = {{"type", "object"}};
 std::string string_argument(const Json& arguments, const char* key) {
     const auto found = arguments.find(key);
     return found != arguments.end() && found->is_string() ? found->get<std::string>() : std::string();
-}
-
-fs::path absolute_path(const Json& arguments, const char* key) {
-    const auto path = from_utf8(string_argument(arguments, key));
-    if (!path.is_absolute()) throw Error("InvalidPath", "An absolute path is required");
-    return path.lexically_normal();
-}
-
-// The watched location that contains a path; the deepest one when locations are nested.
-std::optional<Root> root_of(const Hub& hub, const fs::path& path) {
-    std::optional<Root> best;
-    for (auto& root : hub.catalog.roots())
-        if (root.enabled && path_within(path, root.path) &&
-            (!best || path_key(root.path).size() > path_key(best->path).size()))
-            best = std::move(root);
-    return best;
-}
-
-// Files are only ever written inside locations the user registered.
-fs::path destination(const Hub& hub, const Json& arguments, const char* key) {
-    const auto path = absolute_path(arguments, key);
-    if (!root_of(hub, path))
-        throw Error("OutsideLocations", "The destination must be inside a location registered in CyModelHub. "
-                                        "Add the folder as a location first (roots_add).");
-    return path;
 }
 
 Model require(const Hub& hub, const Json& arguments) {
@@ -139,7 +116,12 @@ Json duplicates(const std::vector<Model>& models) {
 }
 } // namespace
 
-Hub::Hub(fs::path directory) : data_directory(std::move(directory)), catalog(data_directory / "catalog.json") {}
+Hub::Hub(fs::path directory)
+    : data_directory(std::move(directory)), catalog(data_directory / "catalog.json"),
+      ledger(data_directory / "requests.json", cymcp::sha256(cymcp::random_token(16)).substr(0, 8)),
+      reservations(data_directory / "installs.json") {
+    jobs.on_finished = [this](const Json& job) { ledger.job_finished(job); };
+}
 
 std::string Hub::start_scan(const std::string& root_id) {
     std::lock_guard lock(scan_mutex_);
@@ -190,6 +172,13 @@ Json Hub::scan(const std::string& root_id, const Job& job) {
         };
         job.update(total, 0, to_utf8(root.path));
         auto found = scan_root(root, context);
+        // The files of a complete model belong to its entry: they are not listed one by one.
+        std::erase_if(found, [&](const Model& model) {
+            return std::any_of(previous.begin(), previous.end(), [&](const Model& known) {
+                return known.package.is_object() && known.folder &&
+                       path_key(known.path) != path_key(model.path) && path_within(model.path, known.path);
+            });
+        });
         const auto merged = catalog.merge_scan(root, std::move(found));
         total += merged.found;
         summary.push_back({{"root", root.id}, {"found", merged.found}, {"added", merged.added},
@@ -205,10 +194,36 @@ Json Hub::scan(const std::string& root_id, const Job& job) {
 std::shared_ptr<cymcp::Registry> make_registry(std::shared_ptr<Hub> hub) {
     auto registry = std::make_shared<cymcp::Registry>(cymcp::Policy::allow_all());
     // Every operation reports failures as a coded error with readable UTF-8 text, whatever threw.
-    const auto add = [&registry](cymcp::Operation operation) {
-        operation.handler = [handler = std::move(operation.handler)](const Json& args, const CallContext& context) {
+    // An operation that changes something accepts an idempotency key: sent again with the same
+    // key and the same arguments, it answers as the first time and has no second effect.
+    // `guard` holds the checks that must pass before a remembered answer is given.
+    using Guard = std::function<void(const Json&)>;
+    const auto add = [&registry, hub](cymcp::Operation operation, Guard guard = {}) {
+        const bool keyed = !operation.read_only && operation.name != "hub_shutdown" &&
+                           operation.name != "jobs_cancel" && operation.name != "install_leave";
+        if (keyed)
+            operation.input_schema["properties"]["idempotencyKey"] = text(
+                128, "Optional. 8 to 128 letters, digits, '.', '_', ':' or '-', chosen at random by the "
+                     "caller and holding no secret. The same key with the same arguments returns the "
+                     "first answer (with \"replayed\": true) instead of acting again; with other arguments "
+                     "it is refused as IdempotencyConflict. Remembered for 7 days.");
+        operation.handler = [hub, keyed, name = operation.name, guard = std::move(guard),
+                             handler = std::move(operation.handler)](const Json& args,
+                                                                     const CallContext& context) {
             try {
-                return handler(args, context);
+                if (guard) guard(args);
+                const auto key = keyed ? string_argument(args, "idempotencyKey") : std::string();
+                if (!keyed || !args.contains("idempotencyKey")) return handler(args, context);
+                if (key.size() < 8 ||
+                    key.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                                          "0123456789._:-") != std::string::npos)
+                    throw Error("InvalidArguments",
+                                "idempotencyKey must be 8 to 128 letters, digits, '.', '_', "
+                                "':' or '-'");
+                auto plain = args;
+                plain.erase("idempotencyKey");
+                return hub->ledger.run(name, key, Ledger::fingerprint(name, plain),
+                                       [&] { return handler(plain, context); });
             } catch (const Error&) {
                 throw;
             } catch (const Failure& failure) {
@@ -248,7 +263,8 @@ std::shared_ptr<cymcp::Registry> make_registry(std::shared_ptr<Hub> hub) {
                                    {"models", models.size()},
                                    {"size", size},
                                    {"revision", hub->catalog.revision()},
-                                   {"jobsRunning", hub->jobs.running_count()}};
+                                   {"jobsRunning", hub->jobs.running_count()},
+                                   {"installs", hub->reservations.list().size()}};
                    }, {}});
 
     auto list_properties = filters;
@@ -464,7 +480,28 @@ std::shared_ptr<cymcp::Registry> make_registry(std::shared_ptr<Hub> hub) {
                                                         [hub = hub.get(), model](const Job& job) {
                            job.update(0, 0, model.name);
                            const auto hash = lower(cymcp::sha256_file(model.path, job.cancellation()));
-                           hub->catalog.update(model.id, [&](Model& m) { m.sha256 = hash; });
+                           std::error_code error;
+                           const auto size = fs::file_size(model.path, error);
+                           const auto modified = file_time_seconds(fs::last_write_time(model.path, error));
+                           hub->catalog.update(model.id, [&](Model& m) {
+                               m.sha256 = hash;
+                               // The hash is a measure taken now: later checks compare with it.
+                               auto validation = m.validation.is_object() ? m.validation : Json::object();
+                               const auto state = validation.value("state", std::string("ready"));
+                               validation["state"] = state;
+                               validation["level"] = "hashes";
+                               validation["checked"] = now_seconds();
+                               validation["size"] = size;
+                               validation["modified"] = modified;
+                               validation["hashedAt"] = now_seconds();
+                               if (!validation.contains("hashSource")) validation["hashSource"] = "measured";
+                               if (!validation.contains("problems")) validation["problems"] = Json::array();
+                               validation["integrity"] = state != "ready" ? "none"
+                                                         : validation["hashSource"] == "expected"
+                                                             ? "verified"
+                                                             : "recorded";
+                               m.validation = std::move(validation);
+                           });
                            return Json{{"id", model.id}, {"sha256", hash}};
                        });
                        return Json{{"job", job}};
@@ -525,73 +562,240 @@ std::shared_ptr<cymcp::Registry> make_registry(std::shared_ptr<Hub> hub) {
                        return Json{{"job", hub->start_scan(string_argument(args, "root"))}};
                    }, {}});
 
-    add({"install_start", "Download a model into a registered location and add it to the catalogue. Give "
-                                    "either a direct HTTPS url, or a Hugging Face repository and file. Runs as a job "
-                                    "with progress; an interrupted download resumes. The SHA-256 is verified when "
-                                    "it is known.",
-                   object_schema({{"url", text(2048, "Direct https:// address of the model file (http:// is "
-                                                     "accepted for this computer only).")},
-                                  {"repository", text(200, "Hugging Face repository, e.g. org/name.")},
-                                  {"file", text(500, "File inside the repository, e.g. model.Q4_K_M.gguf.")},
-                                  {"revision", text(100, "Branch, tag or commit. Default: main.")},
-                                  {"destination", text(4096, "Absolute path of the folder, inside a registered "
-                                                             "location. Default: CyModelHub's own store.")},
-                                  {"filename", text(200, "Name to save as. Default: the name in the address.")},
-                                  {"sha256", text(64, "Expected SHA-256, 64 hex digits.")},
-                                  {"token", text(400, "Access token for gated downloads. It is sent only to the "
-                                                      "site of the address and is not stored.")}}),
-                   output, false, [hub](const Json& args, const CallContext&) {
-                       Download request;
-                       request.url = string_argument(args, "url");
-                       const auto repository = string_argument(args, "repository");
-                       if (request.url.empty()) {
-                           const auto file = string_argument(args, "file");
-                           if (repository.empty() || file.empty())
-                               throw Error("InvalidArguments", "Give a url, or a repository and a file");
-                           request.url = huggingface_url(repository, file, string_argument(args, "revision"));
-                       }
-                       // HTTPS, or plain HTTP from this computer only (a local mirror).
-                       cymcp::parse_url(request.url);
-                       request.directory = args.contains("destination") ? destination(*hub, args, "destination")
-                                                                        : managed_store();
-                       request.filename = string_argument(args, "filename");
-                       request.sha256 = string_argument(args, "sha256");
-                       request.token = string_argument(args, "token");
-                       if (request.token.empty() && request.url.rfind("https://huggingface.co/", 0) == 0)
-                           request.token = environment("HF_TOKEN");
-                       const auto job = hub->jobs.start("install", "Install " + request.url.substr(0, 200),
-                                                        [hub = hub.get(), request, repository](const Job& job) {
-                           const auto downloaded = download_file(request, job);
-                           ScanContext scan;
-                           scan.cancellation = job.cancellation();
-                           auto model = describe_path(downloaded.path, scan);
-                           if (!model) throw Error("NotAModel", "The downloaded file is not a usable model");
-                           const auto root = root_of(*hub, downloaded.path);
-                           model->root = root ? root->id : "manual";
-                           model->source = root ? root->kind : "manual";
-                           model->url = request.url;
-                           model->repo = repository;
-                           model->sha256 = downloaded.sha256;
-                           return Json{{"model", hub->catalog.add(std::move(*model)).to_json(false)}};
-                       });
-                       return Json{{"job", job}};
-                   }, {}});
+    const Json file_list = {
+        {"type", "array"},
+        {"minItems", 1},
+        {"maxItems", 2000},
+        {"description", "The files of the model."},
+        {"items",
+         object_schema({{"path", text(400, "Path inside the model folder, with forward slashes. No "
+                                           "drive, no \"..\".")},
+                        {"size", {{"type", "integer"}, {"minimum", 0}, {"description", "Size in bytes."}}},
+                        {"sha256", text(64, "SHA-256, 64 hex digits.")},
+                        {"role", text(40, "weights, shard, index, config, tokenizer, manifest...")},
+                        {"required", boolean("False for a file the model works without. Default: true.")}},
+                       {"path"})}};
+    const auto names = [](std::initializer_list<std::pair<const char*, const char*>> fields) {
+        Json properties = Json::object();
+        for (const auto& [name, description] : fields) properties[name] = text(2048, description);
+        return object_schema(std::move(properties));
+    };
+    Json package = object_schema(
+        {{"identity", names({{"name", "Display name."},
+                             {"repository", "Where the model comes from, e.g. org/name."},
+                             {"revision", "Revision of the source. A commit is immutable; a branch is not."},
+                             {"variant", "Which build of the model, e.g. q8, fp16, int6."}})},
+         {"provenance", names({{"source", "huggingface, url, application..."},
+                               {"url", "Address of the source. A query is not kept."},
+                               {"application", "The application that brought the model."}})},
+         {"classification", names({{"format", "Storage format."},
+                                   {"type", "Role, see models_list."},
+                                   {"modality", "Domain, see models_list."},
+                                   {"architecture", "Model family."},
+                                   {"quantization", "Quantization."}})},
+         {"entry",
+          text(400, "Path, among `files`, of the file the engine opens. Empty when it takes the folder.")},
+         {"files", file_list},
+         {"dependencies",
+          {{"type", "array"},
+           {"maxItems", 32},
+           {"description", "Other models this one needs. They are recorded, not installed."},
+           {"items", object_schema({{"name", text(200, "Name.")},
+                                    {"repository", text(200, "Repository.")},
+                                    {"revision", text(200, "Revision.")},
+                                    {"variant", text(200, "Variant.")},
+                                    {"sha256", text(64, "SHA-256 of its main file.")},
+                                    {"required", boolean("Default: true.")}})}}}},
+        {"files"});
+    package["description"] =
+        "A complete model: {identity: {name, repository, revision, variant}, provenance: "
+        "{source, url, application}, classification: {format, type, modality, architecture, "
+        "quantization}, entry, files: [{path, size, sha256, role, required}], dependencies: "
+        "[{name, repository, revision, variant, sha256, required}]}. Only `files` is "
+        "required. Paths are relative to the model folder; a path that would leave it is "
+        "refused. See docs/INTEGRATION.md.";
 
-    add({"jobs_list", "Background jobs (scan, install, move, hash) with their state and progress.",
-                   object_schema(Json::object()), output, true,
-                   [hub](const Json&, const CallContext&) { return Json{{"jobs", hub->jobs.list()}}; }, {}});
+    add({"install_start",
+         "Download a model into a registered location and add it to the catalogue: one file (a direct "
+         "https url, or a Hugging Face repository and file), or a complete model made of several files "
+         "(`package`). Always answers with a job. Asking for a model that is being installed joins that "
+         "installation (`joined`) and returns the same job with a `ticket` of its own; asking for one "
+         "that is installed returns it (`installed`) through a job that is already done. Nothing is "
+         "downloaded twice: when the same model is asked for another destination, the answer names "
+         "the place it is or will be (`destination`, `destinationHonored`: false) and models_link can "
+         "show it elsewhere. A complete model is assembled in a folder ending in .incomplete, every "
+         "file is checked, and only then does it take its name and appear as ready. Interrupted "
+         "downloads resume, also after a restart of the service. A failed job carries a `code`: "
+         "ProviderAccessRequired, HashMismatch, SizeMismatch, ValidationFailed, ModelIncomplete, "
+         "DownloadFailed, AlreadyExists, Cancelled.",
+         object_schema({{"url", text(2048, "Direct https:// address of the model file (http:// is accepted "
+                                           "for this computer only).")},
+                        {"repository", text(200, "Hugging Face repository, e.g. org/name.")},
+                        {"file", text(500, "File inside the repository, e.g. model.Q4_K_M.gguf.")},
+                        {"revision", text(100, "Branch, tag or commit. Default: main. Give a commit for an "
+                                               "identity that cannot change.")},
+                        {"variant", text(100, "Which build of the model this is, when several exist.")},
+                        {"package", package},
+                        {"baseUrl", text(2048, "With `package`: address under which its files are found "
+                                               "(baseUrl/path). Default: the Hugging Face repository.")},
+                        {"destination", text(4096, "Absolute path of the folder, inside a registered "
+                                                   "location. Default: CyModelHub's own store.")},
+                        {"filename", text(200, "Name of the file, or of the folder of a complete model. "
+                                               "Default: the name in the address, or the model name.")},
+                        {"sha256", text(64, "Expected SHA-256 of the single file, 64 hex digits.")},
+                        {"token", text(400, "Access token for gated downloads. It is sent only to the site "
+                                            "of the address; it is never stored, logged or returned.")}}),
+         output,
+         false,
+         [hub](const Json& args, const CallContext&) { return start_install(*hub, args); },
+         {}},
+        [hub](const Json& args) { check_install(*hub, args); });
 
-    add({"jobs_get", "State of one job: running, done, failed or cancelled, with progress and result.",
-                   object_schema({{"id", text(24, "Job ID.")}}, {"id"}), output, true,
-                   [hub](const Json& args, const CallContext&) {
-                       return Json{{"job", hub->jobs.get(string_argument(args, "id"))}};
-                   }, {}});
+    add({"install_leave",
+         "Stop waiting for an installation, a registration or a verification started or joined with "
+         "this ticket. The work goes on for the other requesters; it is cancelled only when the last "
+         "one leaves.",
+         object_schema({{"job", text(24, "Job ID.")}, {"ticket", text(64, "Ticket returned with the job.")}},
+                       {"job", "ticket"}),
+         output,
+         false,
+         [hub](const Json& args, const CallContext&) {
+             const auto job = string_argument(args, "job");
+             const auto left = hub->reservations.leave(job, string_argument(args, "ticket"));
+             const bool cancelled = left.last && hub->jobs.cancel(job);
+             return Json{{"left", left.known}, {"cancelled", cancelled}, {"requesters", left.requesters}};
+         },
+         {}});
 
-    add({"jobs_cancel", "Ask a running job to stop.",
-                   object_schema({{"id", text(24, "Job ID.")}}, {"id"}), output, false,
-                   [hub](const Json& args, const CallContext&) {
-                       return Json{{"cancelled", hub->jobs.cancel(string_argument(args, "id"))}};
-                   }, {}});
+    add({"installs_list",
+         "Installations, registrations and verifications in progress, with the number of requesters "
+         "waiting for each, and the installations a stop of the service left unfinished (state "
+         "interrupted): the next install_start for the same model takes them up where they stopped.",
+         object_schema(Json::object()),
+         output,
+         true,
+         [hub](const Json&, const CallContext&) { return Json{{"installs", hub->reservations.list()}}; },
+         {}});
+
+    add({"models_register",
+         "Catalogue a complete model that an application already has on disk, where it is: nothing is "
+         "copied or moved. The package lists every file the model needs; each one is looked for under "
+         "`root`, its size is compared and, unless verify is sizes, its SHA-256 is computed. Runs as a "
+         "job whose result is the model with its `state`: ready, incomplete (a required file is "
+         "missing) or invalid (a size or a hash does not match). A model is never announced ready "
+         "because its folder exists.",
+         object_schema({{"root", text(4096, "Absolute path of the model folder.")},
+                        {"package", package},
+                        {"verify",
+                         {{"type", "string"},
+                          {"enum", {"hashes", "sizes"}},
+                          {"description", "hashes (default) reads every file once; sizes only "
+                                          "looks at presence and sizes."}}}},
+                       {"root", "package"}),
+         output,
+         false,
+         [hub](const Json& args, const CallContext&) { return start_registration(*hub, args); },
+         {}},
+        [hub](const Json& args) { check_registration(*hub, args); });
+
+    add({"models_verify",
+         "Check an installed model again, as a job: presence and sizes of its files and, with level "
+         "hashes, their SHA-256 against the expected or the recorded ones. Finds missing and damaged "
+         "files; never repairs or deletes anything.",
+         object_schema(
+             {{"id", identifier},
+              {"level",
+               {{"type", "string"}, {"enum", {"hashes", "sizes"}}, {"description", "Default: hashes."}}}},
+             {"id"}),
+         output,
+         false,
+         [hub](const Json& args, const CallContext&) { return start_verification(*hub, args); },
+         {}});
+
+    add({"models_check",
+         "Strict answer to \"can I use this model now?\", for applications. Unlike models_resolve it "
+         "never picks the closest match. Say exactly which model (id, or repository, name, file, "
+         "sha256) and what it must be (format, architecture, quantization, revision, variant, files). "
+         "status is one of: ready (use `path`, or `entry` for the file the engine opens), absent, "
+         "installing (see `job`), incomplete (required files are missing), invalid (a size or a hash "
+         "does not match: the validation failed), unverified (the evidence asked with `integrity` was "
+         "never gathered: run models_verify), incompatible (see `reasons`), ambiguous (several "
+         "different models answer: see `candidates`). Reads no file content.",
+         object_schema({{"id", identifier},
+                        {"repository", text(200, "Exact repository, e.g. org/name.")},
+                        {"name", text(200, "Exact display name, file name or file name without extension.")},
+                        {"file", text(400, "Exact file name, or path of a file of a complete model.")},
+                        {"sha256", text(64, "SHA-256 of the file, or of one file of a complete model.")},
+                        {"revision", text(100, "Revision the model must come from.")},
+                        {"variant", text(100, "Variant the model must be.")},
+                        {"format", filters.at("format")},
+                        {"architecture", filters.at("architecture")},
+                        {"quantization", text(60, "Quantization, e.g. Q4_K_M.")},
+                        {"type", filters.at("type")},
+                        {"modality", filters.at("modality")},
+                        {"files",
+                         {{"type", "array"},
+                          {"maxItems", 2000},
+                          {"description", "Files the application needs, with the sizes and hashes "
+                                          "it expects."},
+                          {"items", object_schema({{"path", text(400, "Path inside the model.")},
+                                                   {"size", {{"type", "integer"}, {"minimum", 0}}},
+                                                   {"sha256", text(64, "Expected SHA-256.")}},
+                                                  {"path"})}}},
+                        {"integrity",
+                         {{"type", "string"},
+                          {"enum", {"none", "sizes", "hashes"}},
+                          {"description", "Least evidence accepted. none: being on disk is "
+                                          "enough. sizes (default): the expected sizes are "
+                                          "known and match. hashes: the SHA-256 of the files "
+                                          "was checked and they did not change since."}}}}),
+         output,
+         true,
+         [hub](const Json& args, const CallContext&) { return check_model(*hub, args); },
+         {}});
+
+    add({"jobs_list",
+         "Background jobs (scan, install, register, verify, move, hash) with their state and "
+         "progress.",
+         object_schema(Json::object()),
+         output,
+         true,
+         [hub](const Json&, const CallContext&) { return Json{{"jobs", hub->jobs.list()}}; },
+         {}});
+
+    add({"jobs_get",
+         "State of one job: running, done, failed or cancelled, with progress and result; a "
+         "failed job has a `code`. A job started with an idempotency key is still answered "
+         "after a restart of the service, with how it ended, or with state interrupted when "
+         "the service stopped first.",
+         object_schema({{"id", text(24, "Job ID.")}}, {"id"}),
+         output,
+         true,
+         [hub](const Json& args, const CallContext&) {
+             const auto id = string_argument(args, "id");
+             if (auto job = hub->jobs.find(id)) return Json{{"job", std::move(*job)}};
+             if (auto past = hub->ledger.job(id)) return Json{{"job", std::move(*past)}};
+             throw Error("NotFound", "No job has this ID");
+         },
+         {}});
+
+    add({"jobs_cancel",
+         "Ask a running job to stop. A job that several requesters wait for is not stopped "
+         "by one of them (`shared`: true): each uses install_leave; `force` stops it for "
+         "everyone.",
+         object_schema(
+             {{"id", text(24, "Job ID.")}, {"force", boolean("Stop the job even when others wait for it.")}},
+             {"id"}),
+         output,
+         false,
+         [hub](const Json& args, const CallContext&) {
+             const auto id = string_argument(args, "id");
+             const auto requesters = hub->reservations.requesters(id);
+             if (requesters > 1 && !args.value("force", false))
+                 return Json{{"cancelled", false}, {"shared", true}, {"requesters", requesters}};
+             return Json{{"cancelled", hub->jobs.cancel(id)}};
+         },
+         {}});
 
     add({"hub_shutdown", "Stop the CyModelHub service. Applications start it again when they need it.",
                    object_schema(Json::object()), output, false, [hub](const Json&, const CallContext&) {

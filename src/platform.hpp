@@ -27,8 +27,11 @@ inline constexpr int default_service_port = 48787;
 class Failure : public std::runtime_error {
   public:
     std::string code;
-    Failure(std::string failure_code, const std::string& message)
-        : std::runtime_error(message), code(std::move(failure_code)) {}
+    // For a failed exchange: whether the request had started to leave. When it had not, the
+    // server never saw it and sending it again cannot repeat anything.
+    bool request_sent = false;
+    Failure(std::string failure_code, const std::string& message, bool sent = false)
+        : std::runtime_error(message), code(std::move(failure_code)), request_sent(sent) {}
 };
 
 fs::path from_utf8(std::string_view value);

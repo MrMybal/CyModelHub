@@ -10,9 +10,13 @@ and MCP (tools). Run this after changing an operation in src/service.cpp.
 """
 
 import json
+import os
 import pathlib
+import shutil
 import subprocess
 import sys
+import tempfile
+import time
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
@@ -36,16 +40,45 @@ the loopback interface only. A failure is `{"error":{"code":"...","message":"...
 HTTP 400 or 403; the C++ client throws `cymodelhub::Error` with the same code.
 
 Operations marked *job* return `{"job":"<id>"}` at once; follow it with `jobs_get`
-(`Client::wait_job`). Operations marked *read* change nothing.
+(`Client::wait_job`). A job that failed has a `code` that says why. Operations marked *read*
+change nothing.
+
+Every operation that is not a *read* accepts an `idempotencyKey`: sent again with the same key
+and the same arguments, it returns its first answer with `"replayed": true` (and the `outcome`
+of its job once known) instead of acting a second time; with other arguments it is refused as
+`IdempotencyConflict`. Keys are remembered for 7 days, across restarts of the service. The C++
+client sends a request again after a lost answer only when that is safe: a *read*, or a request
+that carries a key.
+
+[docs/INTEGRATION.md](INTEGRATION.md) shows how an application finds, shares, installs and
+registers exactly the model it needs with these operations.
 
 """
 
 
 def main():
-    cli = sys.argv[1]
-    operations = json.loads(subprocess.run([cli, "operations"], capture_output=True, text=True, check=True).stdout)
+    cli = str(pathlib.Path(sys.argv[1]).resolve())
+    # A service of its own, in an empty folder: the catalogue and the models of the person who
+    # runs this script are neither read nor changed.
+    scratch = pathlib.Path(tempfile.mkdtemp(prefix="cymodelhub-api-"))
+    environment = dict(os.environ, CYMODELHUB_DATA=str(scratch / "data"), HF_HUB_CACHE=str(scratch / "hf"),
+                       OLLAMA_MODELS=str(scratch / "ollama"), USERPROFILE=str(scratch / "home"),
+                       HOME=str(scratch / "home"))
+    (scratch / "home").mkdir()
+    try:
+        operations = json.loads(subprocess.run([cli, "operations"], capture_output=True, text=True, check=True,
+                                               env=environment).stdout)
+    finally:
+        subprocess.run([cli, "stop"], capture_output=True, env=environment)
+        # The service needs a moment to stop and let go of its files.
+        for _ in range(30):
+            shutil.rmtree(scratch, ignore_errors=True)
+            if not scratch.exists():
+                break
+            time.sleep(0.1)
     lines = [HEADER, "| Operation | | Purpose |", "| --- | --- | --- |"]
-    jobs = {"models_move", "models_hash", "scan_start", "install_start", "roots_add", "roots_enable"}
+    jobs = {"models_move", "models_hash", "scan_start", "install_start", "roots_add", "roots_enable",
+            "models_register", "models_verify"}
     for operation in operations["operations"]:
         name = operation["name"]
         kind = "read" if operation.get("annotations", {}).get("readOnlyHint") else "job" if name in jobs else "write"

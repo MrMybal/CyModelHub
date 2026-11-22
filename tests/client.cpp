@@ -55,6 +55,8 @@ int main(int argc, char** argv) {
         std::size_t total = 0;
         const auto models = hub.list({}, &total);
         check(total == 2 && models.size() == 2, "two models listed");
+        check(models[0].state == "present" && models[0].integrity == "none" && !models[0].complete,
+              "a model that was only seen is not announced verified");
         cymodelhub::Query loras;
         loras.type = "lora";
         check(hub.list(loras).size() == 1, "typed query");
@@ -70,6 +72,85 @@ int main(int argc, char** argv) {
             check(error.code == "OutsideLocations", "service errors keep their code");
         }
 
+        // The strict path and complete models, through the library.
+        {
+            using cymodelhub::Availability;
+            const auto owned = root / "apps" / "nova";
+            const auto weights = fixtures::gguf_llm("Nova Pack");
+            const std::string config = R"({"context": 8192})";
+            fixtures::write(owned / "weights.gguf", weights);
+            fixtures::write(owned / "config.json", config);
+            cymodelhub::Package package;
+            package.name = "Nova Pack";
+            package.repository = "acme/nova-pack";
+            package.revision = "0123456789abcdef0123456789abcdef01234567";
+            package.variant = "q4";
+            package.application = "client-test";
+            package.architecture = "llama";
+            package.entry = "weights.gguf";
+            package.files = {{"weights.gguf", weights.size(), cymcp::sha256(weights), "weights"},
+                             {"config.json", config.size(), cymcp::sha256(config), "config"}};
+            cymodelhub::Requirement need;
+            need.repository = package.repository;
+            need.revision = package.revision;
+            need.variant = package.variant;
+            need.files = package.files;
+            need.integrity = "hashes";
+            check(hub.check(need).status == Availability::absent, "strict check: absent before registration");
+
+            const auto registration = hub.register_model(owned, package);
+            check(!registration.job.empty() && !registration.ticket.empty() &&
+                      registration.idempotency_key.size() >= 8 && !registration.replayed,
+                  "registration starts a job, with a ticket and a key");
+            const auto model = hub.wait(registration);
+            check(model.state == "ready" && model.integrity == "verified" && model.complete &&
+                      model.path == owned && model.revision == package.revision && model.variant == "q4" &&
+                      model.architecture == "llama",
+                  "complete model registered where it is and verified");
+            auto found = hub.check(need);
+            check(found.ready() && found.status_name == "ready" && found.root == owned &&
+                      found.entry == owned / "weights.gguf" && found.model && found.model->id == model.id,
+                  "strict check: ready, with the folder and the file to open");
+            check(hub.register_model(owned, package, true, registration.idempotency_key).replayed,
+                  "the same registration with the same key is not done twice");
+            auto changed = package;
+            changed.variant = "q8";
+            try {
+                hub.register_model(owned, changed, true, registration.idempotency_key);
+                check(false, "a key reused for another request is refused");
+            } catch (const cymodelhub::Error& error) {
+                check(error.code == "IdempotencyConflict", "a key reused for another request is a conflict");
+            }
+            auto other = need;
+            other.variant = "q8";
+            found = hub.check(other);
+            check(found.status == Availability::incompatible && !found.reasons.empty() && !found.ready(),
+                  "strict check: incompatible, with reasons");
+            check(hub.wait(hub.verify(model.id)).state == "ready", "verification through the library");
+            check(!hub.leave(registration), "leaving a finished job cancels nothing");
+            fixtures::fs::remove(owned / "config.json");
+            found = hub.check(need);
+            check(found.status == Availability::incomplete && !found.problems.empty(),
+                  "strict check: incomplete");
+
+            // An installation that cannot succeed reports why, as an error with a code.
+            cymodelhub::InstallRequest request;
+            request.url = "http://127.0.0.1:9/absent.gguf";
+            const auto installation = hub.install(request);
+            check(!installation.job.empty() && !installation.installed && installation.destination_honored,
+                  "install() answers with a job");
+            try {
+                hub.wait(installation, std::chrono::seconds(60));
+                check(false, "a failed installation throws");
+            } catch (const cymodelhub::Error& error) {
+                check(!error.code.empty() && error.code != "JobFailed",
+                      "a failed installation carries its code");
+            }
+            const auto key = cymodelhub::Client::new_idempotency_key();
+            check(key.size() >= 8 && key != cymodelhub::Client::new_idempotency_key(),
+                  "idempotency keys are random");
+        }
+
         // A second client finds the running service instead of starting another one.
         cymodelhub::Client second(options);
         check(second.invoke("hub_status").at("revision") == hub.invoke("hub_status").at("revision"),
@@ -83,7 +164,7 @@ int main(int argc, char** argv) {
             const auto folder = beside.invoke("hub_status").value("dataDirectory", std::string());
             check(folder.find("data-other") != std::string::npos && beside.endpoint() != hub.endpoint(),
                   "two data folders, two services, two ports");
-            check(hub.invoke("hub_status").value("models", 0) == 2, "the first service still answers");
+            check(hub.invoke("hub_status").value("models", 0) == 3, "the first service still answers");
             beside.invoke("hub_shutdown");
         }
 

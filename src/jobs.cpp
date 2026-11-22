@@ -8,6 +8,8 @@ namespace {
 constexpr std::size_t kept_finished = 40;
 }
 
+Jobs::Jobs() : run_(cymcp::sha256(cymcp::random_token(16)).substr(0, 4)) {}
+
 void Job::update(std::uint64_t done, std::uint64_t total, std::string message) const {
     std::lock_guard lock(jobs_.mutex_);
     for (const auto& entry : jobs_.entries_)
@@ -47,7 +49,7 @@ std::string Jobs::start(std::string kind, std::string title, Work work) {
             item = entries_.erase(item);
             --done;
         }
-        entry->id = "j" + std::to_string(++counter_);
+        entry->id = "j" + run_ + "-" + std::to_string(++counter_);
         entry->kind = std::move(kind);
         entry->title = std::move(title);
         entry->started = now_seconds();
@@ -58,21 +60,41 @@ std::string Jobs::start(std::string kind, std::string title, Work work) {
     // joined) by whoever holds the list, never by the job's own thread.
     entry->thread = std::jthread([this, entry = entry.get(), work = std::move(work)] {
         Json result;
-        std::string state = "done", message;
+        std::string state = "done", message, code;
+        const auto failed = [&](const std::exception& error, std::string error_code) {
+            state = entry->cancellation.cancelled() ? "cancelled" : "failed";
+            code = state == "cancelled" ? "Cancelled" : std::move(error_code);
+            message = cymcp::redact_error_message(system_text(error.what()));
+        };
         try {
             result = work(Job(*this, entry->id, entry->cancellation));
+        } catch (const cymcp::Error& error) {
+            failed(error, error.code);
+        } catch (const Failure& error) {
+            failed(error, error.code);
         } catch (const std::exception& error) {
-            state = entry->cancellation.cancelled() ? "cancelled" : "failed";
-            message = cymcp::redact_error_message(system_text(error.what()));
+            failed(error, "OperationFailed");
         } catch (...) {
             state = "failed";
+            code = "OperationFailed";
             message = "Unexpected error";
         }
-        std::lock_guard lock(mutex_);
-        entry->state = std::move(state);
-        if (!message.empty()) entry->message = std::move(message);
-        entry->result = std::move(result);
-        entry->finished = now_seconds();
+        Json record;
+        {
+            std::lock_guard lock(mutex_);
+            entry->state = std::move(state);
+            entry->code = std::move(code);
+            if (!message.empty()) entry->message = std::move(message);
+            entry->result = std::move(result);
+            entry->finished = now_seconds();
+            record = describe(*entry);
+        }
+        if (on_finished) {
+            try {
+                on_finished(record);
+            } catch (const std::exception&) {
+            }
+        }
     });
     return entry->id;
 }
@@ -91,33 +113,32 @@ std::size_t Jobs::running_count() const {
     return count;
 }
 
-namespace {
-Json describe(const std::string& id, const std::string& kind, const std::string& title, const std::string& state,
-              const std::string& message, std::uint64_t done, std::uint64_t total, std::int64_t started,
-              std::int64_t finished, const Json& result) {
-    Json value = {{"id", id},     {"kind", kind},   {"title", title},     {"state", state},
-                  {"message", message}, {"done", done}, {"total", total}, {"started", started},
-                  {"finished", finished}};
-    if (!result.is_null()) value["result"] = result;
+Json Jobs::describe(const Entry& e) {
+    Json value = {{"id", e.id},       {"kind", e.kind},       {"title", e.title},
+                  {"state", e.state}, {"message", e.message}, {"done", e.done},
+                  {"total", e.total}, {"started", e.started}, {"finished", e.finished}};
+    // Stable identifier of a failure, e.g. ProviderAccessRequired, HashMismatch, Cancelled.
+    if (!e.code.empty()) value["code"] = e.code;
+    if (!e.result.is_null()) value["result"] = e.result;
     return value;
 }
-} // namespace
 
 Json Jobs::list() const {
     std::lock_guard lock(mutex_);
     Json jobs = Json::array();
-    for (const auto& e : entries_)
-        jobs.push_back(describe(e->id, e->kind, e->title, e->state, e->message, e->done, e->total, e->started,
-                                e->finished, e->result));
+    for (const auto& e : entries_) jobs.push_back(describe(*e));
     return jobs;
 }
 
-Json Jobs::get(const std::string& id) const {
+std::optional<Json> Jobs::find(const std::string& id) const {
     std::lock_guard lock(mutex_);
     for (const auto& e : entries_)
-        if (e->id == id)
-            return describe(e->id, e->kind, e->title, e->state, e->message, e->done, e->total, e->started,
-                            e->finished, e->result);
+        if (e->id == id) return describe(*e);
+    return std::nullopt;
+}
+
+Json Jobs::get(const std::string& id) const {
+    if (auto job = find(id)) return std::move(*job);
     throw cymcp::Error("NotFound", "No job has this ID");
 }
 

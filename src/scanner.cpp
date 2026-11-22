@@ -3,6 +3,7 @@
 
 #include "scanner.hpp"
 #include "formats.hpp"
+#include "package.hpp"
 
 #include <algorithm>
 
@@ -19,6 +20,8 @@ void fill(Model& model, Probe probe) {
     model.classified_by = std::move(probe.classified_by);
     model.metadata = std::move(probe.metadata);
     model.unsafe = probe.unsafe;
+    if (!probe.name.empty()) model.name = std::move(probe.name);
+    if (probe.validation.is_object()) model.validation = std::move(probe.validation);
 }
 
 Model describe_file(const fs::path& path, const ScanContext& context) {
@@ -74,6 +77,14 @@ Model describe_folder(const fs::path& path, Probe probe, const ScanContext& cont
     for (const auto& line : listing) joined += line + '\n';
     model.fingerprint = "d" + cymcp::sha256(joined).substr(0, 31);
     apply_path_hints(probe, path, context.hint);
+    if (probe.package.is_object()) {
+        // A folder that announces its files is checked against them: presence and sizes here,
+        // hashes on request (models_verify).
+        auto verified = verify_package(path, std::move(probe.package), false, nullptr, context.cancellation);
+        model.package = std::move(verified.package);
+        model.validation = std::move(verified.validation);
+        model.variant = model.package["identity"].value("variant", std::string());
+    }
     fill(model, std::move(probe));
     return model;
 }
@@ -292,6 +303,11 @@ std::vector<Model> scan_root(const Root& root, const ScanContext& context) {
     return found;
 }
 
+Model describe_tree(const fs::path& folder, const ScanContext& context) {
+    auto probe = probe_folder(folder);
+    return describe_folder(folder, probe ? std::move(*probe) : Probe{}, context);
+}
+
 std::optional<Model> describe_path(const fs::path& path, const ScanContext& context) {
     std::error_code error;
     if (fs::is_directory(path, error)) {
@@ -300,6 +316,10 @@ std::optional<Model> describe_path(const fs::path& path, const ScanContext& cont
         return describe_folder(path, std::move(*probe), context);
     }
     if (!fs::is_regular_file(path, error)) return std::nullopt;
+    // A container that belongs to a complete model stands for its folder.
+    if (lower(to_utf8(path.extension())) == ".fermion")
+        if (auto probe = probe_folder(path.parent_path()))
+            return describe_folder(path.parent_path(), std::move(*probe), context);
     // An unusual extension is accepted only when the content itself is recognised.
     if (!model_extension(path) && probe_file(path).format != "gguf") return std::nullopt;
     return describe_file(path, context);

@@ -50,6 +50,9 @@ class Catalog {
     // Re-check the entries that were added by hand.
     void refresh_manual();
     Model add(Model model);
+    // Forget the entries of files that lie inside a folder now catalogued as one complete
+    // model. No file is touched. Returns how many entries left.
+    std::size_t absorb(const fs::path& folder, const std::string& keep);
     bool remove(const std::string& id);
     Model update(const std::string& id, const std::function<void(Model&)>& change);
 };

@@ -18,18 +18,32 @@ the loopback interface only. A failure is `{"error":{"code":"...","message":"...
 HTTP 400 or 403; the C++ client throws `cymodelhub::Error` with the same code.
 
 Operations marked *job* return `{"job":"<id>"}` at once; follow it with `jobs_get`
-(`Client::wait_job`). Operations marked *read* change nothing.
+(`Client::wait_job`). A job that failed has a `code` that says why. Operations marked *read*
+change nothing.
+
+Every operation that is not a *read* accepts an `idempotencyKey`: sent again with the same key
+and the same arguments, it returns its first answer with `"replayed": true` (and the `outcome`
+of its job once known) instead of acting a second time; with other arguments it is refused as
+`IdempotencyConflict`. Keys are remembered for 7 days, across restarts of the service. The C++
+client sends a request again after a lost answer only when that is safe: a *read*, or a request
+that carries a key.
+
+[docs/INTEGRATION.md](INTEGRATION.md) shows how an application finds, shares, installs and
+registers exactly the model it needs with these operations.
 
 
 | Operation | | Purpose |
 | --- | --- | --- |
 | [`hub_shutdown`](#hub_shutdown) | write | Stop the CyModelHub service. |
 | [`hub_status`](#hub_status) | read | CyModelHub service status: version, data folder, model count, running jobs. |
-| [`install_start`](#install_start) | job | Download a model into a registered location and add it to the catalogue. |
+| [`install_leave`](#install_leave) | write | Stop waiting for an installation, a registration or a verification started or joined with this ticket. |
+| [`install_start`](#install_start) | job | Download a model into a registered location and add it to the catalogue: one file (a direct https url, or a Hugging Face repository and file), or a complete model made of several files (`package`). |
+| [`installs_list`](#installs_list) | read | Installations, registrations and verifications in progress, with the number of requesters waiting for each, and the installations a stop of the service left unfinished (state interrupted): the next install_start for the same model takes them up where they stopped. |
 | [`jobs_cancel`](#jobs_cancel) | write | Ask a running job to stop. |
-| [`jobs_get`](#jobs_get) | read | State of one job: running, done, failed or cancelled, with progress and result. |
-| [`jobs_list`](#jobs_list) | read | Background jobs (scan, install, move, hash) with their state and progress. |
+| [`jobs_get`](#jobs_get) | read | State of one job: running, done, failed or cancelled, with progress and result; a failed job has a `code`. |
+| [`jobs_list`](#jobs_list) | read | Background jobs (scan, install, register, verify, move, hash) with their state and progress. |
 | [`models_add`](#models_add) | write | Register by hand a model file, or a model folder (Diffusers, Transformers, MLX), that lies outside the watched locations. |
+| [`models_check`](#models_check) | read | Strict answer to "can I use this model now?", for applications. |
 | [`models_duplicates`](#models_duplicates) | read | Groups of models with identical content stored at several places, and the disk space the extra copies use. |
 | [`models_facets`](#models_facets) | read | Counts of installed models per type, modality, format, source, architecture and tag, with the total size on disk. |
 | [`models_get`](#models_get) | read | Full record of one model: path, classification, hashes, tags, notes and the metadata read from its header. |
@@ -37,9 +51,11 @@ Operations marked *job* return `{"job":"<id>"}` at once; follow it with `jobs_ge
 | [`models_link`](#models_link) | write | Make an installed model visible inside another application's folder without copying it: a hard link (same drive, no extra space) or a symbolic link. |
 | [`models_list`](#models_list) | read | List the AI models installed on this computer and shared between applications (LLM, diffusion, video, audio, LoRA, VAE...). |
 | [`models_move`](#models_move) | job | Move a model file or folder to another registered location, for example a larger drive. |
+| [`models_register`](#models_register) | job | Catalogue a complete model that an application already has on disk, where it is: nothing is copied or moved. |
 | [`models_remove`](#models_remove) | write | Forget a model: its entry leaves the catalogue. |
 | [`models_resolve`](#models_resolve) | read | Find where a model is installed. |
 | [`models_update`](#models_update) | write | Edit how a model is classified and annotated. |
+| [`models_verify`](#models_verify) | job | Check an installed model again, as a job: presence and sizes of its files and, with level hashes, their SHA-256 against the expected or the recorded ones. |
 | [`roots_add`](#roots_add) | job | Watch a folder for models, for example the models folder of ComfyUI or a drive dedicated to models, and scan it. |
 | [`roots_enable`](#roots_enable) | job | Switch a location on or off. |
 | [`roots_list`](#roots_list) | read | List the locations where models are looked for: the stores of Hugging Face, Ollama and LM Studio when present, CyModelHub's own store, and the folders added by the user. |
@@ -58,32 +74,52 @@ CyModelHub service status: version, data folder, model count, running jobs. The 
 
 No arguments.
 
-## install_start
+## install_leave
 
-Download a model into a registered location and add it to the catalogue. Give either a direct HTTPS url, or a Hugging Face repository and file. Runs as a job with progress; an interrupted download resumes. The SHA-256 is verified when it is known.
+Stop waiting for an installation, a registration or a verification started or joined with this ticket. The work goes on for the other requesters; it is cancelled only when the last one leaves.
 
 | Argument | Type | | Description |
 | --- | --- | --- | --- |
+| `job` | string | required | Job ID. |
+| `ticket` | string | required | Ticket returned with the job. |
+
+## install_start
+
+Download a model into a registered location and add it to the catalogue: one file (a direct https url, or a Hugging Face repository and file), or a complete model made of several files (`package`). Always answers with a job. Asking for a model that is being installed joins that installation (`joined`) and returns the same job with a `ticket` of its own; asking for one that is installed returns it (`installed`) through a job that is already done. Nothing is downloaded twice: when the same model is asked for another destination, the answer names the place it is or will be (`destination`, `destinationHonored`: false) and models_link can show it elsewhere. A complete model is assembled in a folder ending in .incomplete, every file is checked, and only then does it take its name and appear as ready. Interrupted downloads resume, also after a restart of the service. A failed job carries a `code`: ProviderAccessRequired, HashMismatch, SizeMismatch, ValidationFailed, ModelIncomplete, DownloadFailed, AlreadyExists, Cancelled.
+
+| Argument | Type | | Description |
+| --- | --- | --- | --- |
+| `baseUrl` | string |  | With `package`: address under which its files are found (baseUrl/path). Default: the Hugging Face repository. |
 | `destination` | string |  | Absolute path of the folder, inside a registered location. Default: CyModelHub's own store. |
 | `file` | string |  | File inside the repository, e.g. model.Q4_K_M.gguf. |
-| `filename` | string |  | Name to save as. Default: the name in the address. |
+| `filename` | string |  | Name of the file, or of the folder of a complete model. Default: the name in the address, or the model name. |
+| `idempotencyKey` | string |  | Optional. 8 to 128 letters, digits, '.', '_', ':' or '-', chosen at random by the caller and holding no secret. The same key with the same arguments returns the first answer (with "replayed": true) instead of acting again; with other arguments it is refused as IdempotencyConflict. Remembered for 7 days. |
+| `package` | object |  | A complete model: {identity: {name, repository, revision, variant}, provenance: {source, url, application}, classification: {format, type, modality, architecture, quantization}, entry, files: [{path, size, sha256, role, required}], dependencies: [{name, repository, revision, variant, sha256, required}]}. Only `files` is required. Paths are relative to the model folder; a path that would leave it is refused. See docs/INTEGRATION.md. |
 | `repository` | string |  | Hugging Face repository, e.g. org/name. |
-| `revision` | string |  | Branch, tag or commit. Default: main. |
-| `sha256` | string |  | Expected SHA-256, 64 hex digits. |
-| `token` | string |  | Access token for gated downloads. It is sent only to the site of the address and is not stored. |
+| `revision` | string |  | Branch, tag or commit. Default: main. Give a commit for an identity that cannot change. |
+| `sha256` | string |  | Expected SHA-256 of the single file, 64 hex digits. |
+| `token` | string |  | Access token for gated downloads. It is sent only to the site of the address; it is never stored, logged or returned. |
 | `url` | string |  | Direct https:// address of the model file (http:// is accepted for this computer only). |
+| `variant` | string |  | Which build of the model this is, when several exist. |
+
+## installs_list
+
+Installations, registrations and verifications in progress, with the number of requesters waiting for each, and the installations a stop of the service left unfinished (state interrupted): the next install_start for the same model takes them up where they stopped.
+
+No arguments.
 
 ## jobs_cancel
 
-Ask a running job to stop.
+Ask a running job to stop. A job that several requesters wait for is not stopped by one of them (`shared`: true): each uses install_leave; `force` stops it for everyone.
 
 | Argument | Type | | Description |
 | --- | --- | --- | --- |
+| `force` | boolean |  | Stop the job even when others wait for it. |
 | `id` | string | required | Job ID. |
 
 ## jobs_get
 
-State of one job: running, done, failed or cancelled, with progress and result.
+State of one job: running, done, failed or cancelled, with progress and result; a failed job has a `code`. A job started with an idempotency key is still answered after a restart of the service, with how it ended, or with state interrupted when the service stopped first.
 
 | Argument | Type | | Description |
 | --- | --- | --- | --- |
@@ -91,7 +127,7 @@ State of one job: running, done, failed or cancelled, with progress and result.
 
 ## jobs_list
 
-Background jobs (scan, install, move, hash) with their state and progress.
+Background jobs (scan, install, register, verify, move, hash) with their state and progress.
 
 No arguments.
 
@@ -101,7 +137,29 @@ Register by hand a model file, or a model folder (Diffusers, Transformers, MLX),
 
 | Argument | Type | | Description |
 | --- | --- | --- | --- |
+| `idempotencyKey` | string |  | Optional. 8 to 128 letters, digits, '.', '_', ':' or '-', chosen at random by the caller and holding no secret. The same key with the same arguments returns the first answer (with "replayed": true) instead of acting again; with other arguments it is refused as IdempotencyConflict. Remembered for 7 days. |
 | `path` | string | required | Absolute path of the file or folder. |
+
+## models_check
+
+Strict answer to "can I use this model now?", for applications. Unlike models_resolve it never picks the closest match. Say exactly which model (id, or repository, name, file, sha256) and what it must be (format, architecture, quantization, revision, variant, files). status is one of: ready (use `path`, or `entry` for the file the engine opens), absent, installing (see `job`), incomplete (required files are missing), invalid (a size or a hash does not match: the validation failed), unverified (the evidence asked with `integrity` was never gathered: run models_verify), incompatible (see `reasons`), ambiguous (several different models answer: see `candidates`). Reads no file content.
+
+| Argument | Type | | Description |
+| --- | --- | --- | --- |
+| `architecture` | string |  | Model family, e.g. llama, qwen2, sdxl, sd15, flux, wan, whisper. |
+| `file` | string |  | Exact file name, or path of a file of a complete model. |
+| `files` | array of object |  | Files the application needs, with the sizes and hashes it expects. |
+| `format` | string |  | Storage format: gguf, safetensors, pickle, onnx, diffusers, transformers, mlx... |
+| `id` | string |  | Model ID, as returned by models_list or models_resolve. |
+| `integrity` | `none` \| `sizes` \| `hashes` |  | Least evidence accepted. none: being on disk is enough. sizes (default): the expected sizes are known and match. hashes: the SHA-256 of the files was checked and they did not change since. |
+| `modality` | string |  | Domain: text (LLM), image, video, audio, embedding, multimodal, 3d, other. |
+| `name` | string |  | Exact display name, file name or file name without extension. |
+| `quantization` | string |  | Quantization, e.g. Q4_K_M. |
+| `repository` | string |  | Exact repository, e.g. org/name. |
+| `revision` | string |  | Revision the model must come from. |
+| `sha256` | string |  | SHA-256 of the file, or of one file of a complete model. |
+| `type` | string |  | Role: model, lora, vae, controlnet, text_encoder, vision_encoder, embedding, upscaler, adapter, projector, other. |
+| `variant` | string |  | Variant the model must be. |
 
 ## models_duplicates
 
@@ -130,6 +188,7 @@ Compute the SHA-256 of a model file as a job. The hash identifies the exact file
 | Argument | Type | | Description |
 | --- | --- | --- | --- |
 | `id` | string | required | Model ID, as returned by models_list or models_resolve. |
+| `idempotencyKey` | string |  | Optional. 8 to 128 letters, digits, '.', '_', ':' or '-', chosen at random by the caller and holding no secret. The same key with the same arguments returns the first answer (with "replayed": true) instead of acting again; with other arguments it is refused as IdempotencyConflict. Remembered for 7 days. |
 
 ## models_link
 
@@ -139,6 +198,7 @@ Make an installed model visible inside another application's folder without copy
 | --- | --- | --- | --- |
 | `destination` | string | required | Absolute path of the folder that receives the link, inside a registered location. |
 | `id` | string | required | Model ID, as returned by models_list or models_resolve. |
+| `idempotencyKey` | string |  | Optional. 8 to 128 letters, digits, '.', '_', ':' or '-', chosen at random by the caller and holding no secret. The same key with the same arguments returns the first answer (with "replayed": true) instead of acting again; with other arguments it is refused as IdempotencyConflict. Remembered for 7 days. |
 | `mode` | `hard` \| `symbolic` |  | Default: hard for a file, symbolic for a folder. |
 
 ## models_list
@@ -170,7 +230,19 @@ Move a model file or folder to another registered location, for example a larger
 | --- | --- | --- | --- |
 | `destination` | string | required | Absolute path of the destination folder, inside a registered location. |
 | `id` | string | required | Model ID, as returned by models_list or models_resolve. |
+| `idempotencyKey` | string |  | Optional. 8 to 128 letters, digits, '.', '_', ':' or '-', chosen at random by the caller and holding no secret. The same key with the same arguments returns the first answer (with "replayed": true) instead of acting again; with other arguments it is refused as IdempotencyConflict. Remembered for 7 days. |
 | `leaveLink` | boolean |  | Leave a symbolic link at the old place so other applications still find the model. |
+
+## models_register
+
+Catalogue a complete model that an application already has on disk, where it is: nothing is copied or moved. The package lists every file the model needs; each one is looked for under `root`, its size is compared and, unless verify is sizes, its SHA-256 is computed. Runs as a job whose result is the model with its `state`: ready, incomplete (a required file is missing) or invalid (a size or a hash does not match). A model is never announced ready because its folder exists.
+
+| Argument | Type | | Description |
+| --- | --- | --- | --- |
+| `idempotencyKey` | string |  | Optional. 8 to 128 letters, digits, '.', '_', ':' or '-', chosen at random by the caller and holding no secret. The same key with the same arguments returns the first answer (with "replayed": true) instead of acting again; with other arguments it is refused as IdempotencyConflict. Remembered for 7 days. |
+| `package` | object | required | A complete model: {identity: {name, repository, revision, variant}, provenance: {source, url, application}, classification: {format, type, modality, architecture, quantization}, entry, files: [{path, size, sha256, role, required}], dependencies: [{name, repository, revision, variant, sha256, required}]}. Only `files` is required. Paths are relative to the model folder; a path that would leave it is refused. See docs/INTEGRATION.md. |
+| `root` | string | required | Absolute path of the model folder. |
+| `verify` | `hashes` \| `sizes` |  | hashes (default) reads every file once; sizes only looks at presence and sizes. |
 
 ## models_remove
 
@@ -179,6 +251,7 @@ Forget a model: its entry leaves the catalogue. The file itself is never deleted
 | Argument | Type | | Description |
 | --- | --- | --- | --- |
 | `id` | string | required | Model ID, as returned by models_list or models_resolve. |
+| `idempotencyKey` | string |  | Optional. 8 to 128 letters, digits, '.', '_', ':' or '-', chosen at random by the caller and holding no secret. The same key with the same arguments returns the first answer (with "replayed": true) instead of acting again; with other arguments it is refused as IdempotencyConflict. Remembered for 7 days. |
 
 ## models_resolve
 
@@ -200,6 +273,7 @@ Edit how a model is classified and annotated. A field set here is kept by later 
 | `architecture` | string |  | Model family, e.g. llama, qwen2, sdxl, sd15, flux, wan, whisper. |
 | `favorite` | boolean |  | Mark or unmark as favourite. |
 | `id` | string | required | Model ID, as returned by models_list or models_resolve. |
+| `idempotencyKey` | string |  | Optional. 8 to 128 letters, digits, '.', '_', ':' or '-', chosen at random by the caller and holding no secret. The same key with the same arguments returns the first answer (with "replayed": true) instead of acting again; with other arguments it is refused as IdempotencyConflict. Remembered for 7 days. |
 | `modality` | string |  | Domain: text (LLM), image, video, audio, embedding, multimodal, 3d, other. |
 | `name` | string |  | Display name. |
 | `notes` | string |  | Free text. An empty string clears it. |
@@ -207,12 +281,23 @@ Edit how a model is classified and annotated. A field set here is kept by later 
 | `tags` | array of string |  | Replaces the tag list. |
 | `type` | string |  | Role: model, lora, vae, controlnet, text_encoder, vision_encoder, embedding, upscaler, adapter, projector, other. |
 
+## models_verify
+
+Check an installed model again, as a job: presence and sizes of its files and, with level hashes, their SHA-256 against the expected or the recorded ones. Finds missing and damaged files; never repairs or deletes anything.
+
+| Argument | Type | | Description |
+| --- | --- | --- | --- |
+| `id` | string | required | Model ID, as returned by models_list or models_resolve. |
+| `idempotencyKey` | string |  | Optional. 8 to 128 letters, digits, '.', '_', ':' or '-', chosen at random by the caller and holding no secret. The same key with the same arguments returns the first answer (with "replayed": true) instead of acting again; with other arguments it is refused as IdempotencyConflict. Remembered for 7 days. |
+| `level` | `hashes` \| `sizes` |  | Default: hashes. |
+
 ## roots_add
 
 Watch a folder for models, for example the models folder of ComfyUI or a drive dedicated to models, and scan it.
 
 | Argument | Type | | Description |
 | --- | --- | --- | --- |
+| `idempotencyKey` | string |  | Optional. 8 to 128 letters, digits, '.', '_', ':' or '-', chosen at random by the caller and holding no secret. The same key with the same arguments returns the first answer (with "replayed": true) instead of acting again; with other arguments it is refused as IdempotencyConflict. Remembered for 7 days. |
 | `label` | string |  | Name shown for this location. |
 | `path` | string | required | Absolute path of an existing folder. |
 | `recursive` | boolean |  | Also look in sub-folders. Default: true. |
@@ -225,6 +310,7 @@ Switch a location on or off. Switching one off forgets the models found in it; s
 | --- | --- | --- | --- |
 | `enabled` | boolean | required | New state. |
 | `id` | string | required | Location ID. |
+| `idempotencyKey` | string |  | Optional. 8 to 128 letters, digits, '.', '_', ':' or '-', chosen at random by the caller and holding no secret. The same key with the same arguments returns the first answer (with "replayed": true) instead of acting again; with other arguments it is refused as IdempotencyConflict. Remembered for 7 days. |
 
 ## roots_list
 
@@ -239,6 +325,7 @@ Stop watching a folder added by the user and forget the models found in it. No f
 | Argument | Type | | Description |
 | --- | --- | --- | --- |
 | `id` | string | required | Location ID. |
+| `idempotencyKey` | string |  | Optional. 8 to 128 letters, digits, '.', '_', ':' or '-', chosen at random by the caller and holding no secret. The same key with the same arguments returns the first answer (with "replayed": true) instead of acting again; with other arguments it is refused as IdempotencyConflict. Remembered for 7 days. |
 
 ## scan_start
 
@@ -246,4 +333,5 @@ Look for models again in one location, or in all of them. Runs as a job; unchang
 
 | Argument | Type | | Description |
 | --- | --- | --- | --- |
+| `idempotencyKey` | string |  | Optional. 8 to 128 letters, digits, '.', '_', ':' or '-', chosen at random by the caller and holding no secret. The same key with the same arguments returns the first answer (with "replayed": true) instead of acting again; with other arguments it is refused as IdempotencyConflict. Remembered for 7 days. |
 | `root` | string |  | Location ID. Omit to scan everything. |

@@ -23,6 +23,23 @@
 - La bibliothèque cliente est autonome : bibliothèque standard C++, système d'exploitation et
   une copie de nlohmann/json fournie avec le dépôt. L'intégrer dans une application ne
   télécharge rien.
+- Installations partagées : les applications qui demandent le même modèle rejoignent une
+  seule installation et obtiennent le même résultat ; chacune a un ticket, et le travail
+  n'est annulé que lorsque le dernier demandeur s'en va. Une installation interrompue par un
+  arrêt du service est reprise.
+- Clés d'idempotence sur toute opération qui modifie quelque chose : une demande renvoyée
+  après une réponse perdue n'a pas de second effet ; la même clé avec d'autres arguments est
+  un conflit. Conservées 7 jours, y compris après un redémarrage. Le client ne répète plus
+  une écriture qui ne porte pas de clé.
+- Modèles complets : un contrat liste chaque fichier nécessaire à un modèle, avec tailles et
+  SHA-256. Un modèle est installé dans un dossier provisoire et publié seulement quand chaque
+  fichier a passé son contrôle, ou enregistré là où une application le possède déjà, sans
+  copie ni déplacement.
+- Résolution stricte (`models_check`, `Client::check`) : prêt, absent, en cours
+  d'installation, incomplet, invalide, non vérifié, incompatible ou ambigu, jamais « la
+  correspondance la plus proche ».
+- Vraie reconnaissance des modèles de parole Fermion (`.fermion`) : l'index du conteneur est
+  lu et contrôlé par rapport à sa taille, à son manifeste et à sa configuration.
 - Application de bureau construite avec CyUI, en français et en anglais.
 - Manuel CyDoc hors ligne en anglais et en français, accessible depuis les réglages ou avec **F1**.
 - Licences : GPL-3.0-only, sauf la bibliothèque cliente, sous MIT pour que toute application
@@ -45,3 +62,15 @@
   redirection et son en-tête d'empreinte, pas contre huggingface.co.
 - Pas de suppression de fichiers de modèles, pas de remplacement automatique des doublons
   par des liens, pas encore de recherche Civitai.
+- Un fichier endommagé d'un modèle installé est signalé, jamais réparé : quelqu'un doit le
+  remplacer. Les dossiers provisoires et les fichiers partiels des installations qui ne se
+  terminent jamais restent en place.
+- Modèles complets : les fichiers d'un dépôt ne sont pas découverts (l'appelant les liste),
+  les dépendances sont enregistrées mais pas installées, et les archives de téléchargement
+  de Fermion (`.fsq`, `.bps.tar.zst`) ne sont pas décompressées : l'application décompresse,
+  puis enregistre le dossier.
+- Les tests des installations partagées n'utilisent que des fixtures et un serveur local.
+  L'installation d'un modèle complet depuis huggingface.co lui-même n'a pas été exercée.
+- L'application de bureau n'affiche pas encore l'état d'un modèle (prêt, incomplet, invalide).
+- Voir [docs/INTEGRATION.fr.md](docs/INTEGRATION.fr.md) pour les limites du parcours
+  d'intégration.

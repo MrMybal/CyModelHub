@@ -527,12 +527,206 @@ void classify_transformers(Probe& probe, const Json& config) {
     if (probe.modality == "multimodal" && (model_type == "clip" || model_type == "siglip"))
         probe.type = "vision_encoder";
 }
+
+// --- Fermion ------------------------------------------------------------------------------
+
+bool multiply(std::uint64_t& total, std::uint64_t factor) {
+    if (factor && total > (std::uint64_t{1} << 62) / factor) return false;
+    total *= factor;
+    return true;
+}
+
+// Whether a record of this kind and shape can have this many bytes, according to the reader
+// of the format. Returns an empty text when it can.
+std::string fermion_record_problem(const std::string& kind, const std::vector<std::uint64_t>& shape,
+                                   std::uint64_t bytes) {
+    std::uint64_t total = 1;
+    for (const auto dimension : shape)
+        if (!multiply(total, dimension)) return "a shape is too large";
+    if (kind == "fp16") return bytes == total * 2 ? "" : "a fp16 record has the wrong length";
+    if (kind == "five_value") {
+        if (shape.size() != 2) return "a five_value record is not a matrix";
+        // Five ternary digits per byte, one bit per non-zero value, two rows of fp16 scales.
+        const auto rows = shape[0], codes = rows * ((shape[1] + 4) / 5), scales = rows * 4;
+        const auto least = codes + scales, most = least + (total + 7) / 8;
+        return bytes >= least && bytes <= most ? "" : "a five_value record has an impossible length";
+    }
+    if (kind == "int6" || kind == "int8") {
+        if (shape.empty() || shape[0] == 0) return "an integer record has no rows";
+        const auto scales = shape[0] * 2;
+        if (bytes < scales) return "an integer record is shorter than its scales";
+        const auto body = bytes - scales;
+        if (kind == "int8") return body >= total ? "" : "an int8 record is too short";
+        // Four 6-bit values in every three bytes.
+        return body % 3 == 0 && body / 3 * 4 >= total ? "" : "an int6 record has the wrong length";
+    }
+    return "unknown record kind " + kind.substr(0, 40);
+}
+
+Json fermion_manifest(const fs::path& folder) {
+    const auto manifest = read_json(folder / "packed_manifest.json");
+    return manifest.is_object() &&
+                   starts(manifest.value("format", Json()).is_string() ? manifest["format"].get<std::string>()
+                                                                       : std::string(),
+                          "fermion-")
+               ? manifest
+               : Json();
+}
+
+std::string fermion_container_name(const Json& manifest) {
+    const auto found = manifest.find("container");
+    const auto name =
+        found != manifest.end() && found->is_string() ? found->get<std::string>() : std::string();
+    // A plain file name beside the manifest; anything else falls back to the usual name.
+    return name.empty() || name.find_first_of("/\\:") != std::string::npos || name == "." || name == ".."
+               ? "model.fermion"
+               : name;
+}
+
+void classify_fermion(Probe& probe, const std::string& format, const std::string& dense_tables) {
+    probe.format = "fermion";
+    probe.type = "model";
+    probe.classified_by = "header";
+    probe.metadata["containerFormat"] = format;
+    if (format == fermion_parakeet_format) {
+        // The only published kind so far: a quantized Parakeet speech recogniser.
+        probe.architecture = "parakeet";
+        probe.modality = "audio";
+        probe.quantization = dense_tables.empty() ? "five-value" : "five-value-" + lower(dense_tables);
+    }
+}
 } // namespace
 
+FermionContainer inspect_fermion(const fs::path& path) {
+    constexpr std::uint64_t max_header = std::uint64_t{16} << 20;
+    FermionContainer result;
+    std::error_code error;
+    result.file_bytes = fs::file_size(path, error);
+    std::ifstream file(path, std::ios::binary);
+    unsigned char prefix[8]{};
+    if (error || !file.read(reinterpret_cast<char*>(prefix), sizeof(prefix))) {
+        result.problem = "the file is shorter than its length field";
+        return result;
+    }
+    for (int index = 7; index >= 0; --index) result.header_bytes = (result.header_bytes << 8) | prefix[index];
+    if (result.header_bytes < 2 || result.header_bytes > max_header ||
+        result.header_bytes > result.file_bytes - 8) {
+        result.problem = "the announced index does not fit in the file";
+        return result;
+    }
+    std::string text(static_cast<std::size_t>(result.header_bytes), '\0');
+    if (!file.read(text.data(), static_cast<std::streamsize>(text.size()))) {
+        result.problem = "the index cannot be read";
+        return result;
+    }
+    const auto header = Json::parse(text, nullptr, false);
+    const auto format = header.is_object() ? header.find("format") : header.end();
+    const auto index = header.is_object() ? header.find("index") : header.end();
+    if (!header.is_object() || format == header.end() || !format->is_string() || index == header.end() ||
+        !index->is_array()) {
+        result.problem = "the index is not the expected JSON object";
+        return result;
+    }
+    result.format = format->get<std::string>();
+    if (!starts(result.format, "fermion-")) {
+        result.problem = "the container announces an unknown format";
+        return result;
+    }
+    // Record kinds are only known for the published format; another one is checked for its size.
+    const bool known = result.format == fermion_parakeet_format;
+    for (const auto& entry : *index) {
+        const auto valid = entry.is_object() && entry.contains("n") && entry["n"].is_string() &&
+                           entry.contains("k") && entry["k"].is_string() && entry.contains("shape") &&
+                           entry["shape"].is_array() && entry["shape"].size() <= 8 && entry.contains("b") &&
+                           entry["b"].is_number_unsigned();
+        if (!valid) {
+            result.problem = "an index entry is malformed";
+            return result;
+        }
+        std::vector<std::uint64_t> shape;
+        for (const auto& dimension : entry["shape"]) {
+            if (!dimension.is_number_unsigned()) {
+                result.problem = "an index entry is malformed";
+                return result;
+            }
+            shape.push_back(dimension.get<std::uint64_t>());
+        }
+        const auto kind = entry["k"].get<std::string>();
+        const auto bytes = entry["b"].get<std::uint64_t>();
+        if (known)
+            if (auto issue = fermion_record_problem(kind, shape, bytes); !issue.empty()) {
+                result.problem = std::move(issue);
+                return result;
+            }
+        if (bytes > (std::uint64_t{1} << 62) - result.payload_bytes) {
+            result.problem = "the records are larger than any file";
+            return result;
+        }
+        result.payload_bytes += bytes;
+        ++result.records;
+        ++result.kinds[kind.substr(0, 40)];
+    }
+    const auto expected = 8 + result.header_bytes + result.payload_bytes;
+    if (result.records == 0)
+        result.problem = "the container holds no record";
+    else if (result.file_bytes < expected)
+        result.problem = "the file is truncated: " + std::to_string(result.file_bytes) +
+                         " bytes instead of " + std::to_string(expected);
+    else if (result.file_bytes > expected)
+        result.problem = "bytes follow the last record";
+    result.valid = result.problem.empty();
+    return result;
+}
+
+Json structure_problems(const fs::path& root, const Json& package) {
+    Json problems = Json::array();
+    const auto report = [&](const std::string& path, const std::string& detail) {
+        problems.push_back({{"path", path}, {"problem", "structure"}, {"detail", detail}});
+    };
+    const auto files = package.find("files");
+    if (files == package.end() || !files->is_array()) return problems;
+    std::error_code error;
+    for (const auto& file : *files) {
+        const auto relative = file.value("path", std::string());
+        const auto path = root / from_utf8(relative);
+        if (extension(path) != ".fermion" || !fs::is_regular_file(path, error)) continue;
+        const auto container = inspect_fermion(path);
+        if (!container.valid) report(relative, container.problem);
+    }
+    // A Fermion folder says three times what its container is: the manifest, the configuration
+    // and the container itself must agree.
+    const auto manifest = fermion_manifest(root);
+    if (!manifest.is_object()) return problems;
+    const auto name = fermion_container_name(manifest);
+    if (fs::is_regular_file(root / from_utf8(name), error)) {
+        const auto container = inspect_fermion(root / from_utf8(name));
+        if (container.valid && container.format != manifest.value("format", std::string()))
+            report("packed_manifest.json", "the manifest and the container announce different formats");
+        if (const auto bytes = manifest.find("container_bytes");
+            bytes != manifest.end() && bytes->is_number_unsigned() &&
+            bytes->get<std::uint64_t>() != container.file_bytes)
+            report("packed_manifest.json", "the manifest announces another size for the container");
+    }
+    if (fs::is_regular_file(root / "config.json", error)) {
+        const auto config = read_json(root / "config.json");
+        if (!config.is_object()) {
+            report("config.json", "the configuration is not a JSON object");
+        } else if (const auto block = config.find("fermion"); block != config.end() && block->is_object()) {
+            for (const auto& [mine, theirs] :
+                 {std::pair{"container_format", "format"}, std::pair{"container_sha256", "container_sha256"},
+                  std::pair{"container_bytes", "container_bytes"}, std::pair{"container", "container"}})
+                if (block->contains(mine) && manifest.contains(theirs) && (*block)[mine] != manifest[theirs])
+                    report("config.json",
+                           std::string("the configuration and the manifest disagree on ") + theirs);
+        }
+    }
+    return problems;
+}
+
 bool model_extension(const fs::path& path) {
-    static constexpr const char* extensions[] = {".gguf", ".safetensors", ".sft", ".ckpt",   ".pt",
-                                                 ".pth",  ".bin",         ".onnx", ".tflite", ".engine",
-                                                 ".mlmodel"};
+    static constexpr const char* extensions[] = {".gguf",   ".safetensors", ".sft",     ".ckpt",
+                                                 ".pt",     ".pth",         ".bin",     ".onnx",
+                                                 ".tflite", ".engine",      ".mlmodel", ".fermion"};
     const auto actual = extension(path);
     return std::any_of(std::begin(extensions), std::end(extensions),
                        [&](const char* candidate) { return actual == candidate; });
@@ -557,6 +751,31 @@ Probe probe_file(const fs::path& path) {
     // Content first: an Ollama blob has no extension, and a renamed file keeps its header.
     if (std::memcmp(magic, "GGUF", 4) == 0) probe_gguf(path, probe);
     else if (actual == ".safetensors" || actual == ".sft") probe_safetensors(path, probe);
+    else if (actual == ".fermion") {
+        const auto container = inspect_fermion(path);
+        const auto name = to_utf8(path.filename());
+        std::string dense;
+        for (const auto& [kind, count] : container.kinds)
+            if (starts(kind, "int")) dense = kind;
+        classify_fermion(probe, container.format, dense);
+        probe.metadata["records"] = container.records;
+        probe.metadata["recordKinds"] = container.kinds;
+        Json problems = Json::array();
+        std::string state = "incomplete";
+        if (!container.valid) {
+            state = "invalid";
+            probe.classified_by.clear();
+            problems.push_back({{"path", name}, {"problem", "structure"}, {"detail", container.problem}});
+        }
+        // The engine opens the folder: the container needs its configuration and its manifest.
+        std::error_code error;
+        for (const auto* companion : {"config.json", "packed_manifest.json"})
+            if (!fs::is_regular_file(path.parent_path() / companion, error))
+                problems.push_back({{"path", companion}, {"problem", "missing"}});
+        probe.validation = {{"state", state},           {"integrity", "none"},
+                            {"level", "sizes"},         {"companions", true},
+                            {"checked", now_seconds()}, {"problems", std::move(problems)}};
+    }
     if (probe.format.empty()) {
         if (actual == ".safetensors" || actual == ".sft") probe.format = "safetensors";
         else if (actual == ".gguf") probe.format = "gguf";
@@ -579,6 +798,57 @@ Probe probe_file(const fs::path& path) {
 
 std::optional<Probe> probe_folder(const fs::path& path) {
     std::error_code error;
+    if (const auto manifest = fermion_manifest(path); manifest.is_object()) {
+        // A Fermion model is its folder: the container, its configuration and its manifest.
+        Probe probe;
+        const auto text = [&](const char* key) {
+            const auto found = manifest.find(key);
+            return found != manifest.end() && found->is_string() ? found->get<std::string>() : std::string();
+        };
+        classify_fermion(probe, text("format"), text("dense_tables"));
+        for (const auto* key : {"base_model", "license", "status", "five_value_modules", "container_bytes"})
+            if (const auto found = manifest.find(key); found != manifest.end()) probe.metadata[key] = *found;
+        const auto config = read_json(path / "config.json");
+        if (config.is_object()) {
+            for (const auto* key : {"model_type", "sample_rate"})
+                if (const auto found = config.find(key); found != config.end()) probe.metadata[key] = *found;
+            if (const auto block = config.find("fermion"); block != config.end() && block->is_object())
+                if (const auto model = block->find("model"); model != block->end() && model->is_string())
+                    probe.name = model->get<std::string>();
+        }
+        Json container = {
+            {"path", fermion_container_name(manifest)}, {"role", "weights"}, {"required", true}};
+        if (const auto bytes = manifest.find("container_bytes");
+            bytes != manifest.end() && bytes->is_number_unsigned()) {
+            container["size"] = *bytes;
+            container["sizeSource"] = "manifest";
+        }
+        if (const auto hash = lower(text("container_sha256"));
+            hash.size() == 64 && hash.find_first_not_of("0123456789abcdef") == std::string::npos) {
+            container["sha256"] = hash;
+            container["hashSource"] = "manifest";
+        }
+        probe.package = {
+            {"identity",
+             {{"name", probe.name},
+              {"repository", ""},
+              {"revision", ""},
+              {"variant", to_utf8(path.filename())}}},
+            {"provenance", {{"source", "scan"}, {"url", ""}, {"application", ""}}},
+            {"classification",
+             {{"format", probe.format},
+              {"type", probe.type},
+              {"modality", probe.modality},
+              {"architecture", probe.architecture},
+              {"quantization", probe.quantization}}},
+            {"entry", ""},
+            {"files",
+             Json::array({std::move(container),
+                          Json{{"path", "config.json"}, {"role", "config"}, {"required", true}},
+                          Json{{"path", "packed_manifest.json"}, {"role", "manifest"}, {"required", true}}})},
+            {"dependencies", Json::array()}};
+        return probe;
+    }
     if (fs::is_regular_file(path / "model_index.json", error)) {
         const auto index = read_json(path / "model_index.json");
         if (!index.is_object()) return std::nullopt;

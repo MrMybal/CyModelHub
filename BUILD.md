@@ -1,10 +1,10 @@
 # Compiler CyModelHub / Build CyModelHub
 
-Git, CMake 3.24 ou plus récent et un compilateur C++20 sont nécessaires ; Python 3 pour deux
-des tests et les scripts. CMake récupère les versions épinglées de CyMCPSDK, de
+Git, CMake 3.24 ou plus récent et un compilateur C++20 sont nécessaires ; Python 3 pour
+quatre des tests et les scripts. CMake récupère les versions épinglées de CyMCPSDK, de
 CyUI et de SDL3.
 
-Git, CMake 3.24 or newer and a C++20 compiler are required; Python 3 for two of the tests
+Git, CMake 3.24 or newer and a C++20 compiler are required; Python 3 for four of the tests
 and the scripts. CMake fetches the pinned versions of CyMCPSDK, CyUI and SDL3.
 
 Pour compiler sans réseau, indiquez des copies locales / To build offline, point at local
@@ -97,8 +97,11 @@ ctest --test-dir build --output-on-failure --no-tests=error
 | Test | |
 | --- | --- |
 | `core` | Détection des formats, analyse, catalogue et opérations, dans un seul processus. / Format detection, scanning, catalogue and operations, in one process. |
+| `complete` | Modèles complets, format `.fermion` (valide, tronqué, incohérent), résolution stricte, clés d'idempotence et réservations, dans un seul processus. / Complete models, the `.fermion` format (valid, truncated, inconsistent), strict resolution, idempotency keys and reservations, in one process. |
 | `client` | Bout en bout : la bibliothèque démarre le vrai service ; API, MCP HTTP et relais MCP stdio. / End to end: the library starts the real service; API, MCP over HTTP and the MCP stdio relay. |
 | `http` | L'échange HTTP du client contre un serveur local : longueur annoncée, réponse découpée, tronquée ou lente, limite de taille. / The client's HTTP exchange against a local server: announced length, chunked, truncated or slow answers, size limit. |
+| `installs` | Installations partagées avec le vrai service et un serveur local : demandes simultanées, annulation d'un seul demandeur, réponse perdue, redémarrage, service tué en plein téléchargement, modèles complets interrompus, endommagés et complétés. / Shared installations with the real service and a local server: simultaneous requests, one requester giving up, a lost answer, a restart, a service killed mid-download, complete models interrupted, damaged and completed. |
+| `retry` | Ce que le client renvoie quand une réponse est perdue : les lectures et les demandes à clé, jamais une écriture sans clé. / What the client sends again when an answer is lost: reads and keyed requests, never a write without a key. |
 | `download` | Installation contre un serveur HTTP local (redirection, reprise, SHA-256). Aucun accès Internet. / Installation against a local HTTP server (redirect, resume, SHA-256). No Internet access. |
 
 Les tests redirigent tous les dépôts de modèles connus vers un dossier temporaire : ils ne
@@ -122,5 +125,5 @@ CyModelHub --data build/demo-data
 | --- | --- |
 | `scripts/build.ps1` | Compilation Windows / Windows build |
 | `scripts/check_locales.py` | Traductions manquantes ou inutilisées / Missing or unused translations |
-| `scripts/make_api_doc.py` | Régénère `docs/API.md` depuis le service / Regenerates `docs/API.md` from the service |
+| `scripts/make_api_doc.py` | Régénère `docs/API.md` depuis un service isolé, sans lire votre catalogue / Regenerates `docs/API.md` from an isolated service, without reading your catalogue |
 | `scripts/make_demo_library.py` | Faux modèles aux en-têtes réels / Fake models with real headers |

@@ -24,6 +24,9 @@ const char* usage =
     "  add-root <folder>              watch a folder\n"
     "  add <path>                     register one file or model folder\n"
     "  install <url> | install <repository> <file>   download into the CyModelHub store\n"
+    "  check <json>                   strict answer for one exact model, e.g.\n"
+    "                                 check '{\"repository\":\"org/name\",\"integrity\":\"hashes\"}'\n"
+    "  verify <id>                    read an installed model again and check it\n"
     "  duplicates                     identical models stored several times\n"
     "  jobs                           background jobs\n"
     "  call <operation> [json]        any operation of the service\n"
@@ -118,7 +121,15 @@ int run(std::vector<std::string> arguments) {
         std::cerr << '\n';
         std::cout << result.dump(2) << '\n';
         return result.value("state", std::string()) == "done" ? 0 : 1;
-    } else if (command == "duplicates") std::cout << client.invoke("models_duplicates").dump(2) << '\n';
+    } else if (command == "check") {
+        const auto answer =
+            client.invoke("models_check", Json::parse(argument(1).empty() ? "{}" : argument(1)));
+        std::cout << answer.dump(2) << '\n';
+        return answer.value("status", std::string()) == "ready" ? 0 : 1;
+    } else if (command == "verify") {
+        return wait(client, client.invoke("models_verify", {{"id", argument(1)}}));
+    } else if (command == "duplicates")
+        std::cout << client.invoke("models_duplicates").dump(2) << '\n';
     else if (command == "jobs") std::cout << client.invoke("jobs_list").dump(2) << '\n';
     else if (command == "call") {
         const auto args = argument(2).empty() ? Json::object() : Json::parse(argument(2));

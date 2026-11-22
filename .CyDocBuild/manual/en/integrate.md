@@ -5,7 +5,7 @@ description: Look up model paths through the CLI, the C++ client, local HTTP or 
 section: Integration
 parent: overview
 order: 40
-revision: 1
+revision: 2
 # SPDX-License-Identifier: GPL-3.0-only
 ---
 
@@ -46,6 +46,48 @@ if (model) {
 If the service executable is installed elsewhere, set `CYMODELHUB_SERVICE` to its path
 or pass it in `cymodelhub::Options`.
 
+## One exact model for an application {#strict}
+
+`resolve()` returns the closest name. An application that needs one exact model asks the
+strict question instead: which model, what it must be, and which files it opens.
+
+```cpp
+cymodelhub::Requirement need;
+need.repository = "org/name";
+need.revision = "<commit>";
+need.files = {{"model.gguf", 4368439584, "<sha256>"}};
+
+auto found = hub.check(need);
+if (found.ready()) {
+    // found.entry is the shared file or folder. Use it where it is.
+}
+```
+
+The answer is never a look-alike. Its status is one of the following.
+
+| Status | Meaning |
+| --- | --- |
+| `ready` | The model is installed and checked. Use `path` or `entry`. |
+| `absent` | It is not installed. |
+| `installing` | Another application is installing it. `install()` joins that installation. |
+| `incomplete` | Required files are missing. |
+| `invalid` | A size or a SHA-256 does not match. |
+| `unverified` | It is on disk, but was never checked. Run `verify()`. |
+| `incompatible` | It is installed in another format, quantization, revision or variant. |
+| `ambiguous` | Several different models match. None is chosen. |
+
+A model made of several files is described by a `Package` that lists each file. It is
+announced `ready` only when every required file is present and checked.
+
+- `install()` downloads the model, or joins the installation another application started.
+  The model is downloaded once and stored once.
+- `register_model()` catalogues a model your application already downloaded, where it is.
+  Nothing is copied or moved.
+- `leave()` stops waiting. The installation continues for the other applications.
+
+Shared models are persistent. Do not install or register one inside a temporary task
+folder, and do not delete or rewrite a shared model: other applications use the same files.
+
 ## Assistants and local HTTP {#mcp}
 
 For an MCP client that supports HTTP, use **Settings → Copy the MCP configuration**.
@@ -61,4 +103,9 @@ and `Authorization: Bearer <token>`. The loopback URL and token are in your data
 ```
 
 Long-running operations such as `install_start` return a job ID. Use `jobs_get` to poll
-that ID or `Client::wait_job()` in C++.
+that ID or `Client::wait_job()` in C++. A job that failed has a `code` that says why, for
+example `ProviderAccessRequired` when the source wants an access token.
+
+An operation that changes something accepts an `idempotencyKey`. If you send the request
+again with the same key and the same arguments, you get the first answer and nothing happens
+twice. Use a new random key for each new request.

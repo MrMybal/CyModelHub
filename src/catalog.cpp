@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include "catalog.hpp"
+#include "package.hpp"
 #include "scanner.hpp"
 
 #include <algorithm>
@@ -31,7 +32,42 @@ void merge_into(Model& existing, Model incoming) {
     if (incoming.is_locked("type")) incoming.type = std::move(existing.type);
     if (incoming.is_locked("modality")) incoming.modality = std::move(existing.modality);
     if (incoming.is_locked("architecture")) incoming.architecture = std::move(existing.architecture);
+    if (incoming.artifact.empty()) incoming.artifact = std::move(existing.artifact);
+    if (incoming.revision.empty()) incoming.revision = std::move(existing.revision);
+    if (incoming.variant.empty()) incoming.variant = std::move(existing.variant);
     incoming.missing = false;
+    // A scan only looks at presence and sizes. What an application or an installation declared
+    // (identity, classification, hashes) is kept when a scan sees the same place again.
+    const auto declared = [](const Model& model) {
+        return model.package.is_object() &&
+               model.package.value("provenance", Json::object()).value("source", std::string()) != "scan";
+    };
+    const auto ready = [](const Model& model) {
+        return model.validation.value("state", std::string()) == "ready";
+    };
+    if (declared(incoming)) {
+        // A fresh declaration replaces whatever was known.
+    } else if (declared(existing)) {
+        incoming.package = std::move(existing.package);
+        incoming.validation = std::move(existing.validation);
+        incoming.name = std::move(existing.name);
+        incoming.format = std::move(existing.format);
+        incoming.type = std::move(existing.type);
+        incoming.modality = std::move(existing.modality);
+        incoming.architecture = std::move(existing.architecture);
+        incoming.quantization = std::move(existing.quantization);
+        refresh_validation(incoming);
+    } else if (incoming.package.is_object() && existing.package.is_object() && same_content &&
+               existing.validation.is_object() && incoming.validation.is_object() && ready(existing) &&
+               ready(incoming)) {
+        // Same folder, same files: the hashes checked earlier still describe them.
+        incoming.package = std::move(existing.package);
+        incoming.validation = std::move(existing.validation);
+        refresh_validation(incoming);
+    } else if (!incoming.package.is_object() && !incoming.validation.is_object() &&
+               existing.validation.is_object() && same_content) {
+        incoming.validation = std::move(existing.validation);
+    }
     existing = std::move(incoming);
 }
 } // namespace
@@ -219,7 +255,13 @@ Catalog::MergeResult Catalog::merge_scan(const Root& root, std::vector<Model> fo
     }
     for (std::size_t index = 0; index < models_.size(); ++index) {
         auto& model = models_[index];
-        if (model.root != root.id || seen.contains(index) || on_disk(model.path)) continue;
+        if (model.root != root.id || seen.contains(index)) continue;
+        if (on_disk(model.path)) {
+            // Not found by the scan itself, e.g. a complete model registered by an application.
+            model.missing = false;
+            refresh_validation(model);
+            continue;
+        }
         if (!model.missing) ++result.missing;
         model.missing = true;
     }
@@ -235,6 +277,11 @@ void Catalog::refresh_manual() {
         const bool missing = !on_disk(model.path);
         changed = changed || missing != model.missing;
         model.missing = missing;
+        if (!missing && model.validation.is_object()) {
+            const auto before = model.validation;
+            refresh_validation(model);
+            changed = changed || before != model.validation;
+        }
     }
     if (changed) save_locked();
 }
@@ -255,6 +302,16 @@ Model Catalog::add(Model model) {
     models_.push_back(model);
     save_locked();
     return model;
+}
+
+std::size_t Catalog::absorb(const fs::path& folder, const std::string& keep) {
+    std::lock_guard lock(mutex_);
+    const auto removed = std::erase_if(models_, [&](const Model& model) {
+        return model.id != keep && path_key(model.path) != path_key(folder) &&
+               path_within(model.path, folder);
+    });
+    if (removed) save_locked();
+    return removed;
 }
 
 bool Catalog::remove(const std::string& id) {

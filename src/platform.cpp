@@ -455,9 +455,9 @@ LocalResponse local_http(const LocalRequest& request) {
         if (count > 0) {
             sent += static_cast<std::size_t>(count);
         } else if (!pending()) {
-            throw Failure("NetworkError", "The local service closed the connection");
+            throw Failure("NetworkError", "The local service closed the connection", true);
         } else if (!wait_socket(socket, true, deadline)) {
-            throw Failure("Timeout", "The local service did not answer in time");
+            throw Failure("Timeout", "The local service did not answer in time", true);
         }
     }
 
@@ -471,15 +471,15 @@ LocalResponse local_http(const LocalRequest& request) {
         const auto count = ::recv(socket, buffer, static_cast<Length>(sizeof(buffer)), 0);
         if (count == 0) break;
         if (count < 0) {
-            if (!pending()) throw Failure("NetworkError", "The local service closed the connection");
+            if (!pending()) throw Failure("NetworkError", "The local service closed the connection", true);
             if (!wait_socket(socket, false, deadline))
-                throw Failure("Timeout", "The local service did not answer in time");
+                throw Failure("Timeout", "The local service did not answer in time", true);
             continue;
         }
         const auto seen = data.size();
         data.append(buffer, static_cast<std::size_t>(count));
         if (data.size() - 65536 > request.max_response_bytes && data.size() > 65536)
-            throw Failure("ResponseTooLarge", "The answer of the local service is too large");
+            throw Failure("ResponseTooLarge", "The answer of the local service is too large", true);
         if (body_start == std::string::npos) {
             const auto end = data.find("\r\n\r\n", seen < 3 ? 0 : seen - 3);
             if (end == std::string::npos) continue;
@@ -490,7 +490,7 @@ LocalResponse local_http(const LocalRequest& request) {
             if (head.substr(0, 5) != "HTTP/" || space == std::string_view::npos ||
                 std::from_chars(head.data() + space + 1, head.data() + head.size(), response.status).ec !=
                     std::errc())
-                throw Failure("NetworkError", "Unexpected answer from the local service");
+                throw Failure("NetworkError", "Unexpected answer from the local service", true);
             for (auto line = head.find("\r\n"); line != std::string_view::npos;) {
                 head.remove_prefix(line + 2);
                 line = head.find("\r\n");
@@ -517,18 +517,18 @@ LocalResponse local_http(const LocalRequest& request) {
         }
     }
     if (body_start == std::string::npos)
-        throw Failure("NetworkError", "The local service closed the connection");
+        throw Failure("NetworkError", "The local service closed the connection", true);
     if (chunked && !decoded) {
         auto body = unchunked(std::string_view(data).substr(body_start));
-        if (!body) throw Failure("NetworkError", "The answer of the local service is incomplete");
+        if (!body) throw Failure("NetworkError", "The answer of the local service is incomplete", true);
         response.body = std::move(*body);
     } else if (!chunked) {
         if (length != std::string::npos && data.size() - body_start < length)
-            throw Failure("NetworkError", "The answer of the local service is incomplete");
+            throw Failure("NetworkError", "The answer of the local service is incomplete", true);
         response.body = data.substr(body_start, length);
     }
     if (response.body.size() > request.max_response_bytes)
-        throw Failure("ResponseTooLarge", "The answer of the local service is too large");
+        throw Failure("ResponseTooLarge", "The answer of the local service is too large", true);
     return response;
 }
 

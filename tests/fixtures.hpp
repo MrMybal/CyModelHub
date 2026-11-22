@@ -7,6 +7,8 @@
 
 #include "platform.hpp"
 
+#include <cymcp/core.hpp>
+
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -127,5 +129,54 @@ inline std::string vae() {
     header["encoder.down.0.block.0.conv1.weight"] = tensor();
     header["quant_conv.weight"] = tensor();
     return safetensors(header, 'v');
+}
+
+// A .fermion container with the layout of the real ones: an 8-byte length, a JSON index, then
+// the records. The default index holds one record of each kind, with lengths their shapes allow.
+inline Json fermion_index() {
+    return Json::array({{{"n", "encoder.layers.0.linear"}, {"k", "five_value"}, {"shape", {2, 5}}, {"b", 11}},
+                        {{"n", "decoder.embedding"}, {"k", "int6"}, {"shape", {2, 4}}, {"b", 10}},
+                        {{"n", "encoder.table"}, {"k", "fp16"}, {"shape", {32, 32}}, {"b", 2048}},
+                        {{"n", "joint.head.bias"}, {"k", "fp16"}, {"shape", {4}}, {"b", 8}}});
+}
+inline std::string fermion_container(const Json& index = fermion_index(),
+                                     const std::string& format = "fermion-five-value-parakeet-v1") {
+    const auto header = Json{{"format", format}, {"index", index}}.dump();
+    std::string out;
+    put<std::uint64_t>(out, header.size());
+    out += header;
+    for (const auto& record : index) out.append(record.at("b").get<std::size_t>(), 'w');
+    return out;
+}
+
+// The three files of a Fermion speech model. The patches replace fields of the manifest and
+// of the "fermion" block of the configuration, to build folders that contradict themselves.
+inline void fermion_folder(const fs::path& folder, const std::string& container, const std::string& name,
+                           const Json& manifest_patch = Json::object(),
+                           const Json& config_patch = Json::object()) {
+    const auto digest = cymcp::sha256(container);
+    Json manifest = {{"format", "fermion-five-value-parakeet-v1"},
+                     {"status", "PASS"},
+                     {"container", "model.fermion"},
+                     {"container_sha256", digest},
+                     {"container_bytes", container.size()},
+                     {"five_value_modules", 1},
+                     {"dense_tables", "int6"},
+                     {"base_model", "nvidia/parakeet-tdt-0.6b-v3"},
+                     {"license", "cc-by-4.0"}};
+    manifest.update(manifest_patch);
+    Json block = {{"model", name},
+                  {"container", "model.fermion"},
+                  {"container_format", "fermion-five-value-parakeet-v1"},
+                  {"container_sha256", digest},
+                  {"container_bytes", container.size()}};
+    block.update(config_patch);
+    const Json config = {{"sample_rate", 16000},
+                         {"model_type", "parakeet"},
+                         {"joint", {{"vocabulary", {"a", "b"}}}},
+                         {"fermion", block}};
+    write(folder / "model.fermion", container);
+    write(folder / "config.json", config.dump(1));
+    write(folder / "packed_manifest.json", manifest.dump(1));
 }
 } // namespace fixtures

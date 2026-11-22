@@ -4,6 +4,7 @@
       <a href="Documentation/Documentation.html#/fr/overview">Manuel utilisateur</a><br>
       <a href="BUILD.md">Compilation</a><br>
       <a href="docs/API.md">Opérations du service</a><br>
+      <a href="docs/INTEGRATION.fr.md">Intégration d'une application</a><br>
       <a href="VERSION.fr.md">Notes de version</a><br><br>
       <sub>README</sub><br>
       <a href="README.md">English</a> · <a href="README.fr.md">Français</a>
@@ -48,6 +49,13 @@ retrouve, au lieu de télécharger et de stocker sa propre copie.
   pour le rendre visible dans le dossier d'une autre application, sans le copier.
 - **Il installe des modèles.** Depuis un dépôt Hugging Face ou une adresse HTTPS, avec
   progression, reprise et vérification du SHA-256.
+- **Il partage une seule installation entre les applications.** Plusieurs programmes qui
+  demandent le même modèle au même moment obtiennent un seul téléchargement et une seule
+  copie ; une demande envoyée deux fois n'a qu'un effet.
+- **Il connaît les modèles complets.** Un modèle fait de plusieurs fichiers (poids, fragments,
+  configuration, tokenizer, manifeste) n'est annoncé prêt que lorsque chaque fichier
+  obligatoire est présent et contrôlé. Une application peut aussi enregistrer, là où il se
+  trouve, un modèle qu'elle a téléchargé elle-même.
 - **Il fonctionne avec les assistants IA.** Chaque opération est aussi un outil MCP.
 
 CyModelHub ne supprime jamais un fichier de modèle. Il n'écrit que dans les emplacements que
@@ -93,6 +101,34 @@ votre projet ne télécharge rien. Si votre projet définit déjà la cible
 `nlohmann_json::nlohmann_json` avant d'ajouter CyModelHub, c'est cette copie qui est utilisée.
 Un exemple complet se trouve dans [examples/client](examples/client). Le service est cherché
 via `CYMODELHUB_SERVICE`, à côté de votre programme, ou là où il a tourné la dernière fois.
+
+### Un modèle précis
+
+`resolve()` trouve le nom le plus proche, ce qui convient à une personne. Une application qui a
+besoin d'un modèle précis utilise le parcours strict : elle dit quel modèle, ce qu'il doit être
+et quels fichiers elle ouvre, et reçoit une réponse explicite au lieu d'un modèle ressemblant.
+
+```cpp
+cymodelhub::Requirement need;
+need.repository = "org/name";
+need.revision   = "<commit>";
+need.files      = {{"model.gguf", 4368439584, "<sha256>"}};
+
+auto found = hub.check(need);
+if (found.ready())
+    load(found.entry);                          // le fichier partagé : ne jamais le copier
+else if (found.status == cymodelhub::Availability::absent ||
+         found.status == cymodelhub::Availability::installing)
+    load(hub.wait(hub.install(request)).path);  // rejoint une installation déjà en cours
+else
+    report(found.status_name, found.reasons);   // incomplet, invalide, incompatible, ambigu...
+```
+
+Le guide [Intégration d'une application](docs/INTEGRATION.fr.md) décrit tout le parcours :
+résolution stricte, modèles complets, rejoindre une installation, enregistrer un modèle que
+l'application a téléchargé, demandes qui peuvent être envoyées deux fois, et le sens de chaque
+réponse. [examples/client/ensure_model.cpp](examples/client/ensure_model.cpp) est ce parcours
+sous forme de programme.
 
 N'importe quel langage peut parler directement au service : lisez `service.json` dans le
 dossier de données de CyModelHub (`url`, `token`), puis `POST <url>/v1` avec
