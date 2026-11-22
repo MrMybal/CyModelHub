@@ -171,6 +171,7 @@ struct Ui::Impl {
     Data& data;
     Settings& settings;
     SDL_Window* window;
+    SDL_Texture* logo;
     std::shared_ptr<const Snapshot> snap;
 
     Filter filter;
@@ -199,7 +200,8 @@ struct Ui::Impl {
         install_token[256]{}, subfolder[256]{};
     bool leave_link = true, preset_select = false, capture_relative_paths = false;
 
-    Impl(Data& d, Settings& s, SDL_Window* w) : data(d), settings(s), window(w) {}
+    Impl(Data& d, Settings& s, SDL_Window* w, SDL_Texture* logo_texture)
+        : data(d), settings(s), window(w), logo(logo_texture) {}
 
     void open_manual() {
         const auto directory = modelhub::executable_path().parent_path();
@@ -390,6 +392,12 @@ struct Ui::Impl {
 
     void sidebar() {
         if (cyui::beginSidebar("##nav", 236.0f)) {
+            if (logo) {
+                const float size = cyui::dp(28.0f);
+                ImGui::Image(ImTextureRef(reinterpret_cast<ImTextureID>(logo)), ImVec2(size, size));
+                ImGui::SameLine(0.0f, cyui::dp(6.0f));
+                ImGui::AlignTextToFramePadding();
+            }
             cyui::sidebarHeader("CYMODELHUB", CYMODELHUB_VERSION);
             const auto total = snap->facets.value("total", std::size_t{0});
             const auto favorites = snap->facets.value("favorites", std::size_t{0});
@@ -1194,7 +1202,8 @@ struct Ui::Impl {
     }
 };
 
-Ui::Ui(Data& data, Settings& settings, SDL_Window* window) : impl_(std::make_unique<Impl>(data, settings, window)) {}
+Ui::Ui(Data& data, Settings& settings, SDL_Window* window, SDL_Texture* logo)
+    : impl_(std::make_unique<Impl>(data, settings, window, logo)) {}
 Ui::~Ui() = default;
 void Ui::draw() { impl_->draw(); }
 

@@ -61,17 +61,22 @@ void run(const Arguments& arguments) {
         SDL_CreateWindow("CyModelHub", 1360, 840, SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_HIDDEN),
         SDL_DestroyWindow);
     if (!window) throw std::runtime_error(SDL_GetError());
-    if (const auto* base = SDL_GetBasePath()) {
-        const auto icon_path = std::string(base) + "assets/branding/cymodelhub-icon.png";
-        std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> icon(
-            SDL_LoadPNG(icon_path.c_str()), SDL_DestroySurface);
-        if (icon) SDL_SetWindowIcon(window.get(), icon.get());
-    }
     SDL_SetWindowMinimumSize(window.get(), 960, 600);
     std::unique_ptr<SDL_Renderer, decltype(&SDL_DestroyRenderer)> renderer(SDL_CreateRenderer(window.get(), nullptr),
                                                                            SDL_DestroyRenderer);
     if (!renderer) throw std::runtime_error(SDL_GetError());
     SDL_SetRenderVSync(renderer.get(), 1);
+
+    std::unique_ptr<SDL_Texture, decltype(&SDL_DestroyTexture)> logo(nullptr, SDL_DestroyTexture);
+    if (const auto* base = SDL_GetBasePath()) {
+        const auto icon_path = std::string(base) + "assets/branding/cymodelhub-icon.png";
+        std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> icon(
+            SDL_LoadPNG(icon_path.c_str()), SDL_DestroySurface);
+        if (icon) {
+            SDL_SetWindowIcon(window.get(), icon.get());
+            logo.reset(SDL_CreateTextureFromSurface(renderer.get(), icon.get()));
+        }
+    }
 
     auto settings = app::load_settings();
     if (!arguments.theme.empty()) settings.theme = arguments.theme;
@@ -100,7 +105,7 @@ void run(const Arguments& arguments) {
 
     {
         app::Data data;
-        app::Ui ui(data, settings, window.get());
+        app::Ui ui(data, settings, window.get(), logo.get());
         ui.preset(arguments.page, arguments.select, arguments.dialog,
                   !arguments.capture.empty() && arguments.capture_relative_paths);
         int frame = 0, settled = 0;

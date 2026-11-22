@@ -5,6 +5,7 @@
 
 #include "app_data.hpp"
 
+struct SDL_Texture;
 struct SDL_Window;
 
 namespace app {
@@ -19,7 +20,7 @@ class Ui {
     std::unique_ptr<Impl> impl_;
 
   public:
-    Ui(Data& data, Settings& settings, SDL_Window* window);
+    Ui(Data& data, Settings& settings, SDL_Window* window, SDL_Texture* logo);
     ~Ui();
     void draw();
     // True while something moves on screen (a job runs), so the host keeps redrawing.
