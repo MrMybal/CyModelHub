@@ -1,0 +1,513 @@
+{
+  "schemaVersion": 1,
+  "name": "CyModelHub",
+  "version": "0.1.0",
+  "defaultLocale": "en",
+  "locales": [
+    {
+      "code": "en",
+      "label": "English"
+    },
+    {
+      "code": "fr",
+      "label": "Français"
+    }
+  ],
+  "aliases": {},
+  "pages": [
+    {
+      "id": "install",
+      "title": "Download a model",
+      "description": "Download from Hugging Face or a direct HTTPS URL and follow the job in Activity.",
+      "section": "Catalogue",
+      "parent": "library",
+      "order": 30,
+      "revision": "1",
+      "locale": "en",
+      "html": "<h2 id=\"download\">Start a download<a class=\"heading-anchor\" href=\"#/en/install/download\" aria-label=\"Link to Start a download\">#</a></h2><ol>\n<li>Choose <strong>Install…</strong>.</li>\n<li>For <strong>Hugging Face</strong>, enter the repository as <code>owner/name</code> and the exact file path in\nthat repository. If access is gated, accept the repository terms in your Hugging Face\naccount and provide an authorized Hugging Face token.</li>\n<li>For <strong>Address</strong>, enter the direct HTTPS URL. Supply the publisher&#39;s SHA-256 when\navailable so CyModelHub can check the downloaded file.</li>\n<li>Choose the destination in a <a href=\"#/en/library/locations\">registered location</a>, then choose\n<strong>Download</strong>. The CyModelHub store is available as a destination.</li>\n</ol>\n<h2 id=\"progress\">Follow progress<a class=\"heading-anchor\" href=\"#/en/install/progress\" aria-label=\"Link to Follow progress\">#</a></h2><p>Open <strong>Activity</strong> to see progress and failures. Use its cancel control to stop a running\ndownload. CyModelHub can resume when a partial download is available and the server supports\nit. Successful downloads are added to the catalogue. Select the new entry to copy its path\nand use it with your model runtime.</p>\n",
+      "text": "Start a download # Choose Install… . For Hugging Face , enter the repository as owner/name and the exact file path in that repository. If access is gated, accept the repository terms in your Hugging Face account and provide an authorized Hugging Face token. For Address , enter the direct HTTPS URL. Supply the publisher's SHA-256 when available so CyModelHub can check the downloaded file. Choose the destination in a registered location , then choose Download . The CyModelHub store is available as a destination. Follow progress # Open Activity to see progress and failures. Use its cancel control to stop a running download. CyModelHub can resume when a partial download is available and the server supports it. Successful downloads are added to the catalogue. Select the new entry to copy its path and use it with your model runtime.",
+      "headings": [
+        {
+          "id": "download",
+          "text": "Start a download",
+          "level": 2
+        },
+        {
+          "id": "progress",
+          "text": "Follow progress",
+          "level": 2
+        }
+      ],
+      "anchors": [],
+      "languages": [],
+      "code": "",
+      "assets": [],
+      "links": [
+        "#/en/library/locations"
+      ],
+      "kind": "guide"
+    },
+    {
+      "id": "integrate",
+      "title": "Connect scripts, applications and assistants",
+      "description": "Look up model paths through the CLI, the C++ client, local HTTP or MCP.",
+      "section": "Integration",
+      "parent": "overview",
+      "order": 40,
+      "revision": "1",
+      "locale": "en",
+      "html": "<h2 id=\"cli\">Command line<a class=\"heading-anchor\" href=\"#/en/integrate/cli\" aria-label=\"Link to Command line\">#</a></h2><p>Run the CLI from the installation directory or add it to your shell&#39;s command path.\nThe CLI and the desktop application use the same catalogue when they use the same data\ndirectory.</p>\n<div class=\"code-block\"><div class=\"code-toolbar\"><span>text</span><button type=\"button\" data-copy-code>Copy</button></div><pre><code class=\"language-text\"><span class=\"code-line\" id=\"L1\" data-line=\"1\">CyModelHubCli status</span><span class=\"code-line\" id=\"L2\" data-line=\"2\">CyModelHubCli list --type lora</span><span class=\"code-line\" id=\"L3\" data-line=\"3\">CyModelHubCli where sd_xl_base_1.0</span><span class=\"code-line\" id=\"L4\" data-line=\"4\">CyModelHubCli operations</span></code></pre></div><p><code>where</code> prints the file or folder path of the best installed match. Use <code>list --json</code> for\nstructured output. <code>operations</code> lists the complete operation catalogue and parameter schemas.</p>\n<h2 id=\"cpp\">C++ client<a class=\"heading-anchor\" href=\"#/en/integrate/cpp\" aria-label=\"Link to C++ client\">#</a></h2><p>The client is MIT-licensed and requires C++20. Add the CyModelHub source checkout to your\nCMake project with <code>add_subdirectory</code> and link <code>CyModelHub::Client</code>.</p>\n<div class=\"code-block\"><div class=\"code-toolbar\"><span>cpp</span><button type=\"button\" data-copy-code>Copy</button></div><pre><code class=\"language-cpp\"><span class=\"code-line\" id=\"code-2-L1\" data-line=\"1\"><span class=\"token macro property\"><span class=\"token directive-hash\">#</span><span class=\"token directive keyword\">include</span> <span class=\"token string\">&lt;cymodelhub/client.hpp></span></span></span><span class=\"code-line\" id=\"code-2-L2\" data-line=\"2\"> </span><span class=\"code-line\" id=\"code-2-L3\" data-line=\"3\">cymodelhub<span class=\"token double-colon punctuation\">::</span>Client hub<span class=\"token punctuation\">;</span></span><span class=\"code-line\" id=\"code-2-L4\" data-line=\"4\"><span class=\"token keyword\">auto</span> model <span class=\"token operator\">=</span> hub<span class=\"token punctuation\">.</span><span class=\"token function\">resolve</span><span class=\"token punctuation\">(</span><span class=\"token string\">\"sd_xl_base_1.0\"</span><span class=\"token punctuation\">,</span> <span class=\"token string\">\"model\"</span><span class=\"token punctuation\">,</span> <span class=\"token string\">\"image\"</span><span class=\"token punctuation\">)</span><span class=\"token punctuation\">;</span></span><span class=\"code-line\" id=\"code-2-L5\" data-line=\"5\"><span class=\"token keyword\">if</span> <span class=\"token punctuation\">(</span>model<span class=\"token punctuation\">)</span> <span class=\"token punctuation\">{</span></span><span class=\"code-line\" id=\"code-2-L6\" data-line=\"6\">    <span class=\"token keyword\">const</span> <span class=\"token keyword\">auto</span><span class=\"token operator\">&amp;</span> installed_path <span class=\"token operator\">=</span> model<span class=\"token operator\">-></span>path<span class=\"token punctuation\">;</span></span><span class=\"code-line\" id=\"code-2-L7\" data-line=\"7\">    <span class=\"token comment\">// Pass installed_path to your application's runtime.</span></span><span class=\"code-line\" id=\"code-2-L8\" data-line=\"8\"><span class=\"token punctuation\">}</span></span></code></pre></div><p><code>resolve()</code> returns an empty value when there is no match. Service errors can be caught as\n<code>cymodelhub::Error</code>. <code>Client::invoke()</code> accepts a service operation and JSON arguments.\nIf the service executable is installed elsewhere, set <code>CYMODELHUB_SERVICE</code> to its path\nor pass it in <code>cymodelhub::Options</code>.</p>\n<h2 id=\"mcp\">Assistants and local HTTP<a class=\"heading-anchor\" href=\"#/en/integrate/mcp\" aria-label=\"Link to Assistants and local HTTP\">#</a></h2><p>For an MCP client that supports HTTP, use <strong>Settings → Copy the MCP configuration</strong>.\nThe copied configuration contains a local access token. Keep it private. A client that\nlaunches a stdio server can run the installed <code>CyModelHubMcp</code> executable instead.</p>\n<p>Other languages can send JSON to <code>POST &lt;url&gt;/v1</code> with <code>Content-Type: application/json</code>\nand <code>Authorization: Bearer &lt;token&gt;</code>. The loopback URL and token are in your data folder&#39;s\n<code>service.json</code>. The following request lists installed LoRA adapters.</p>\n<div class=\"code-block\"><div class=\"code-toolbar\"><span>json</span><button type=\"button\" data-copy-code>Copy</button></div><pre><code class=\"language-json\"><span class=\"code-line\" id=\"code-3-L1\" data-line=\"1\"><span class=\"token punctuation\">{</span><span class=\"token property\">\"method\"</span><span class=\"token operator\">:</span><span class=\"token string\">\"invoke\"</span><span class=\"token punctuation\">,</span><span class=\"token property\">\"name\"</span><span class=\"token operator\">:</span><span class=\"token string\">\"models_list\"</span><span class=\"token punctuation\">,</span><span class=\"token property\">\"arguments\"</span><span class=\"token operator\">:</span><span class=\"token punctuation\">{</span><span class=\"token property\">\"type\"</span><span class=\"token operator\">:</span><span class=\"token string\">\"lora\"</span><span class=\"token punctuation\">}</span><span class=\"token punctuation\">}</span></span></code></pre></div><p>Long-running operations such as <code>install_start</code> return a job ID. Use <code>jobs_get</code> to poll\nthat ID or <code>Client::wait_job()</code> in C++.</p>\n",
+      "text": "Command line # Run the CLI from the installation directory or add it to your shell's command path. The CLI and the desktop application use the same catalogue when they use the same data directory. text Copy CyModelHubCli status CyModelHubCli list --type lora CyModelHubCli where sd_xl_base_1.0 CyModelHubCli operations where prints the file or folder path of the best installed match. Use list --json for structured output. operations lists the complete operation catalogue and parameter schemas. C++ client # The client is MIT-licensed and requires C++20. Add the CyModelHub source checkout to your CMake project with add_subdirectory and link CyModelHub::Client . cpp Copy # include <cymodelhub/client.hpp> cymodelhub :: Client hub ; auto model = hub . resolve ( \"sd_xl_base_1.0\" , \"model\" , \"image\" ) ; if ( model ) { const auto & installed_path = model -> path ; // Pass installed_path to your application's runtime. } resolve() returns an empty value when there is no match. Service errors can be caught as cymodelhub::Error . Client::invoke() accepts a service operation and JSON arguments. If the service executable is installed elsewhere, set CYMODELHUB_SERVICE to its path or pass it in cymodelhub::Options . Assistants and local HTTP # For an MCP client that supports HTTP, use Settings → Copy the MCP configuration . The copied configuration contains a local access token. Keep it private. A client that launches a stdio server can run the installed CyModelHubMcp executable instead. Other languages can send JSON to POST <url>/v1 with Content-Type: application/json and Authorization: Bearer <token> . The loopback URL and token are in your data folder's service.json . The following request lists installed LoRA adapters. json Copy { \"method\" : \"invoke\" , \"name\" : \"models_list\" , \"arguments\" : { \"type\" : \"lora\" } } Long-running operations such as install_start return a job ID. Use jobs_get to poll that ID or Client::wait_job() in C++. CyModelHubCli status CyModelHubCli list --type lora CyModelHubCli where sd_xl_base_1.0 CyModelHubCli operations #include <cymodelhub/client.hpp> cymodelhub::Client hub; auto model = hub.resolve(\"sd_xl_base_1.0\", \"model\", \"image\"); if (model) { const auto& installed_path = model->path; // Pass installed_path to your application's runtime. } {\"method\":\"invoke\",\"name\":\"models_list\",\"arguments\":{\"type\":\"lora\"}}",
+      "headings": [
+        {
+          "id": "cli",
+          "text": "Command line",
+          "level": 2
+        },
+        {
+          "id": "cpp",
+          "text": "C++ client",
+          "level": 2
+        },
+        {
+          "id": "mcp",
+          "text": "Assistants and local HTTP",
+          "level": 2
+        }
+      ],
+      "anchors": [
+        "L1",
+        "L2",
+        "L3",
+        "L4",
+        "code-2-L1",
+        "code-2-L2",
+        "code-2-L3",
+        "code-2-L4",
+        "code-2-L5",
+        "code-2-L6",
+        "code-2-L7",
+        "code-2-L8",
+        "code-3-L1"
+      ],
+      "languages": [
+        "text",
+        "cpp",
+        "json"
+      ],
+      "code": "CyModelHubCli status\nCyModelHubCli list --type lora\nCyModelHubCli where sd_xl_base_1.0\nCyModelHubCli operations\n#include <cymodelhub/client.hpp>\n\ncymodelhub::Client hub;\nauto model = hub.resolve(\"sd_xl_base_1.0\", \"model\", \"image\");\nif (model) {\n    const auto& installed_path = model->path;\n    // Pass installed_path to your application's runtime.\n}\n{\"method\":\"invoke\",\"name\":\"models_list\",\"arguments\":{\"type\":\"lora\"}}",
+      "assets": [],
+      "links": [],
+      "kind": "guide"
+    },
+    {
+      "id": "library",
+      "title": "Find and register models",
+      "description": "Choose watched folders, register a single model and narrow down the catalogue.",
+      "section": "Catalogue",
+      "parent": "overview",
+      "order": 10,
+      "revision": "1",
+      "locale": "en",
+      "html": "<h2 id=\"locations\">Choose where to look<a class=\"heading-anchor\" href=\"#/en/library/locations\" aria-label=\"Link to Choose where to look\">#</a></h2><p>Under <strong>Locations</strong>, CyModelHub lists the Hugging Face, Ollama and LM Studio stores it\ncan find, its own storage folder and any folders you register. To add a library such as a\nComfyUI models folder, choose <strong>Add…</strong>, select the folder, then choose <strong>Watch this folder</strong>.\nThe service starts scanning it. To refresh one location, use its scan button in <strong>Locations</strong>.</p>\n<p>Use <strong>Add this model</strong> for an individual file or a Diffusers, Transformers or MLX pipeline\nfolder outside watched locations. Registering an existing model leaves its files in place.</p>\n<h2 id=\"search\">Search and inspect<a class=\"heading-anchor\" href=\"#/en/library/search\" aria-label=\"Link to Search and inspect\">#</a></h2><p>Use the search field and the sidebar categories to narrow the list by purpose, role or\nsource. Select an entry for its file details, classification and notes. <strong>Open the folder</strong>\nreveals its location. <strong>Copy the path</strong> gives another application the path to that model.\nYou can also <a href=\"#/en/integrate/cli\">resolve the path from a script</a>.</p>\n<h2 id=\"formats\">What CyModelHub recognizes<a class=\"heading-anchor\" href=\"#/en/library/formats\" aria-label=\"Link to What CyModelHub recognizes\">#</a></h2><p>CyModelHub reads GGUF and safetensors headers for available information such as architecture,\nquantization and context length. A supported multi-file pipeline appears as one model.\nOther formats may be classified from filenames and their surrounding folders.</p>\n<p>The catalogue does not load weights or unpickle files. When an entry is marked as a pickle\nfile, choose a trusted format for use in your runtime. If an automatic classification is\nwrong, <a href=\"#/en/organize/classification\">edit the model record</a>.</p>\n",
+      "text": "Choose where to look # Under Locations , CyModelHub lists the Hugging Face, Ollama and LM Studio stores it can find, its own storage folder and any folders you register. To add a library such as a ComfyUI models folder, choose Add… , select the folder, then choose Watch this folder . The service starts scanning it. To refresh one location, use its scan button in Locations . Use Add this model for an individual file or a Diffusers, Transformers or MLX pipeline folder outside watched locations. Registering an existing model leaves its files in place. Search and inspect # Use the search field and the sidebar categories to narrow the list by purpose, role or source. Select an entry for its file details, classification and notes. Open the folder reveals its location. Copy the path gives another application the path to that model. You can also resolve the path from a script . What CyModelHub recognizes # CyModelHub reads GGUF and safetensors headers for available information such as architecture, quantization and context length. A supported multi-file pipeline appears as one model. Other formats may be classified from filenames and their surrounding folders. The catalogue does not load weights or unpickle files. When an entry is marked as a pickle file, choose a trusted format for use in your runtime. If an automatic classification is wrong, edit the model record .",
+      "headings": [
+        {
+          "id": "locations",
+          "text": "Choose where to look",
+          "level": 2
+        },
+        {
+          "id": "search",
+          "text": "Search and inspect",
+          "level": 2
+        },
+        {
+          "id": "formats",
+          "text": "What CyModelHub recognizes",
+          "level": 2
+        }
+      ],
+      "anchors": [],
+      "languages": [],
+      "code": "",
+      "assets": [],
+      "links": [
+        "#/en/integrate/cli",
+        "#/en/organize/classification"
+      ],
+      "kind": "guide"
+    },
+    {
+      "id": "organize",
+      "title": "Organize, move and share models",
+      "description": "Edit classification, compare duplicate files, and use registered folders to move or link models.",
+      "section": "Catalogue",
+      "parent": "library",
+      "order": 20,
+      "revision": "1",
+      "locale": "en",
+      "html": "<h2 id=\"classification\">Edit model details<a class=\"heading-anchor\" href=\"#/en/organize/classification\" aria-label=\"Link to Edit model details\">#</a></h2><p>Select a model, then use <strong>Classification</strong> to edit its name, kind, role or family and add\ntags or notes. Choose <strong>Save</strong>. Use the star to include it in <strong>Favourites</strong>. Manual\nclassification is retained on later scans. <strong>Detect again</strong> restores the detected\nclassification for that entry.</p>\n<h2 id=\"duplicates\">Review duplicates<a class=\"heading-anchor\" href=\"#/en/organize/duplicates\" aria-label=\"Link to Review duplicates\">#</a></h2><p>Open <strong>Duplicates</strong> for files with identical content and the estimated space used by the\nextra copies. Each row can open the containing folder or take you to the model record.</p>\n<figure data-cydoc-module=\"image\" data-cydoc-id=\"duplicate-list\" data-config=\"{&quot;id&quot;:&quot;duplicate-list&quot;,&quot;src&quot;:&quot;assets/duplicates.png&quot;,&quot;alt&quot;:&quot;Two identical demo models in separate folders on the Duplicates page&quot;,&quot;controls&quot;:&quot;minimal&quot;}\"><img src=\"assets/duplicates.png\" alt=\"Two identical demo models in separate folders on the Duplicates page\" loading=\"lazy\" decoding=\"async\"></figure><p>For the selected model, <strong>File → SHA-256 → Compute</strong> runs a hash job. You can see its progress\nunder <strong>Activity</strong>. <strong>Forget this entry</strong> removes its record, tags and notes from the\ncatalogue. A future scan can rediscover it in a watched folder.</p>\n<h2 id=\"share\">Move or link a model<a class=\"heading-anchor\" href=\"#/en/organize/share\" aria-label=\"Link to Move or link a model\">#</a></h2><p>Open <strong>Share and move</strong> in the model details. Choose <strong>Move…</strong> to free\nspace at the original location. Across drives the service copies and verifies the model\nbefore completing the move. Keep <strong>Leave a link at the old place</strong> enabled when other\nsoftware still uses the old path.</p>\n<p>Choose <strong>Link into a folder…</strong> to make the model visible to another application without\na second copy. A hard link requires a file on the same filesystem. A symbolic link can\nspan drives if the operating system permits it. Register the destination folder in\n<a href=\"#/en/library/locations\">Locations</a> before moving, linking or downloading into it.</p>\n",
+      "text": "Edit model details # Select a model, then use Classification to edit its name, kind, role or family and add tags or notes. Choose Save . Use the star to include it in Favourites . Manual classification is retained on later scans. Detect again restores the detected classification for that entry. Review duplicates # Open Duplicates for files with identical content and the estimated space used by the extra copies. Each row can open the containing folder or take you to the model record. For the selected model, File → SHA-256 → Compute runs a hash job. You can see its progress under Activity . Forget this entry removes its record, tags and notes from the catalogue. A future scan can rediscover it in a watched folder. Move or link a model # Open Share and move in the model details. Choose Move… to free space at the original location. Across drives the service copies and verifies the model before completing the move. Keep Leave a link at the old place enabled when other software still uses the old path. Choose Link into a folder… to make the model visible to another application without a second copy. A hard link requires a file on the same filesystem. A symbolic link can span drives if the operating system permits it. Register the destination folder in Locations before moving, linking or downloading into it.",
+      "headings": [
+        {
+          "id": "classification",
+          "text": "Edit model details",
+          "level": 2
+        },
+        {
+          "id": "duplicates",
+          "text": "Review duplicates",
+          "level": 2
+        },
+        {
+          "id": "share",
+          "text": "Move or link a model",
+          "level": 2
+        }
+      ],
+      "anchors": [],
+      "languages": [],
+      "code": "",
+      "assets": [
+        "assets/duplicates.png"
+      ],
+      "links": [
+        "#/en/library/locations"
+      ],
+      "kind": "media"
+    },
+    {
+      "id": "overview",
+      "title": "Get started with CyModelHub",
+      "description": "Open CyModelHub, discover your installed models and find the file you need.",
+      "section": "CyModelHub",
+      "order": 0,
+      "revision": "1",
+      "locale": "en",
+      "html": "<h2 id=\"start\">Open CyModelHub<a class=\"heading-anchor\" href=\"#/en/overview/start\" aria-label=\"Link to Open CyModelHub\">#</a></h2><p>CyModelHub keeps a catalogue of the AI models already on your computer. The desktop app,\ncommand line and client library use the same local service. Install or register a model\nonce and other applications can ask for its path.</p>\n<p>With a Windows build, keep the installed files together and launch <code>CyModelHub.exe</code>.\nThe desktop app starts the service as needed. Windows x64 is the verified platform for\nthis version. Linux and macOS are targets that have yet to be built or tested.</p>\n<p>Use <strong>F1</strong> or <strong>Settings → User manual (F1)</strong> to open this manual. From a local copy\nof the repository or installed files, you can also open <code>Documentation/Documentation.html</code>\ndirectly. Keep its <code>DocData</code> folder next to it.</p>\n<h2 id=\"first-scan\">Find your first model<a class=\"heading-anchor\" href=\"#/en/overview/first-scan\" aria-label=\"Link to Find your first model\">#</a></h2><ol>\n<li>Open <strong>Locations</strong> to see the model stores detected on this computer.</li>\n<li>Choose <strong>Add… → Watch this folder</strong> for a library stored elsewhere, or <strong>Add this model</strong>\nto register a single file or pipeline directory.</li>\n<li>Choose <strong>Scan</strong> or press <strong>F5</strong> to refresh the catalogue. Select a model to see its\nclassification and file details.</li>\n</ol>\n<figure data-cydoc-module=\"image\" data-cydoc-id=\"model-list\" data-config=\"{&quot;id&quot;:&quot;model-list&quot;,&quot;src&quot;:&quot;assets/models.png&quot;,&quot;alt&quot;:&quot;The CyModelHub catalogue with the model list and the selected model’s details&quot;,&quot;controls&quot;:&quot;minimal&quot;}\"><img src=\"assets/models.png\" alt=\"The CyModelHub catalogue with the model list and the selected model’s details\" loading=\"lazy\" decoding=\"async\"></figure><h2 id=\"next\">Choose what to do next<a class=\"heading-anchor\" href=\"#/en/overview/next\" aria-label=\"Link to Choose what to do next\">#</a></h2><ul>\n<li><a href=\"#/en/library/locations\">Find and register installed models</a></li>\n<li><a href=\"#/en/organize/classification\">Organize, move and share models</a></li>\n<li><a href=\"#/en/install/download\">Download a model</a></li>\n<li><a href=\"#/en/integrate/cli\">Connect scripts, clients and assistants</a></li>\n<li><a href=\"#/en/troubleshoot/missing\">Troubleshoot the catalogue or service</a></li>\n</ul>\n",
+      "text": "Open CyModelHub # CyModelHub keeps a catalogue of the AI models already on your computer. The desktop app, command line and client library use the same local service. Install or register a model once and other applications can ask for its path. With a Windows build, keep the installed files together and launch CyModelHub.exe . The desktop app starts the service as needed. Windows x64 is the verified platform for this version. Linux and macOS are targets that have yet to be built or tested. Use F1 or Settings → User manual (F1) to open this manual. From a local copy of the repository or installed files, you can also open Documentation/Documentation.html directly. Keep its DocData folder next to it. Find your first model # Open Locations to see the model stores detected on this computer. Choose Add… → Watch this folder for a library stored elsewhere, or Add this model to register a single file or pipeline directory. Choose Scan or press F5 to refresh the catalogue. Select a model to see its classification and file details. Choose what to do next # Find and register installed models Organize, move and share models Download a model Connect scripts, clients and assistants Troubleshoot the catalogue or service",
+      "headings": [
+        {
+          "id": "start",
+          "text": "Open CyModelHub",
+          "level": 2
+        },
+        {
+          "id": "first-scan",
+          "text": "Find your first model",
+          "level": 2
+        },
+        {
+          "id": "next",
+          "text": "Choose what to do next",
+          "level": 2
+        }
+      ],
+      "anchors": [],
+      "languages": [],
+      "code": "",
+      "assets": [
+        "assets/models.png"
+      ],
+      "links": [
+        "#/en/library/locations",
+        "#/en/organize/classification",
+        "#/en/install/download",
+        "#/en/integrate/cli",
+        "#/en/troubleshoot/missing"
+      ],
+      "kind": "media"
+    },
+    {
+      "id": "troubleshoot",
+      "title": "Troubleshoot CyModelHub",
+      "description": "Recover missing catalogue entries and diagnose local service and download failures.",
+      "section": "Help",
+      "parent": "overview",
+      "order": 50,
+      "revision": "1",
+      "locale": "en",
+      "html": "<h2 id=\"missing\">A model is missing<a class=\"heading-anchor\" href=\"#/en/troubleshoot/missing\" aria-label=\"Link to A model is missing\">#</a></h2><p>Check that the drive is mounted and the folder is present and enabled in <strong>Locations</strong>.\nRun a scan with <strong>F5</strong> and clear any search terms or filters. For a manual entry whose\nfile has moved, add the new path and forget the stale entry. For a watched folder, a\nscan can rediscover the model at its new location.</p>\n<h2 id=\"service\">The application cannot reach the service<a class=\"heading-anchor\" href=\"#/en/troubleshoot/service\" aria-label=\"Link to The application cannot reach the service\">#</a></h2><p>Run <code>CyModelHubCli status</code> from the installation directory. Check that\n<code>CyModelHubService</code> is next to the client program or set <code>CYMODELHUB_SERVICE</code> to the service\nexecutable. If using <code>--data</code>, pass the same folder to the app and the CLI. You can run\n<code>CyModelHubCli stop</code> to stop the instance for that data folder, then reopen the app and\nlet it start the service again.</p>\n<h2 id=\"download-error\">A download fails<a class=\"heading-anchor\" href=\"#/en/troubleshoot/download-error\" aria-label=\"Link to A download fails\">#</a></h2><p>Open <strong>Activity</strong> to read the job error. Check the repository file path or direct HTTPS\naddress, available disk space, and the destination&#39;s registration and write permissions.\nFor gated repositories, check your access rights on Hugging Face. If a checksum fails,\ncompare the supplied SHA-256 with the publisher&#39;s value before trying again.</p>\n<h2 id=\"offline\">The offline manual does not open<a class=\"heading-anchor\" href=\"#/en/troubleshoot/offline\" aria-label=\"Link to The offline manual does not open\">#</a></h2><p>Keep <code>Documentation.html</code> and the complete <code>DocData</code> directory in the same\n<code>Documentation</code> folder. Open the HTML file in a browser from this local folder.</p>\n",
+      "text": "A model is missing # Check that the drive is mounted and the folder is present and enabled in Locations . Run a scan with F5 and clear any search terms or filters. For a manual entry whose file has moved, add the new path and forget the stale entry. For a watched folder, a scan can rediscover the model at its new location. The application cannot reach the service # Run CyModelHubCli status from the installation directory. Check that CyModelHubService is next to the client program or set CYMODELHUB_SERVICE to the service executable. If using --data , pass the same folder to the app and the CLI. You can run CyModelHubCli stop to stop the instance for that data folder, then reopen the app and let it start the service again. A download fails # Open Activity to read the job error. Check the repository file path or direct HTTPS address, available disk space, and the destination's registration and write permissions. For gated repositories, check your access rights on Hugging Face. If a checksum fails, compare the supplied SHA-256 with the publisher's value before trying again. The offline manual does not open # Keep Documentation.html and the complete DocData directory in the same Documentation folder. Open the HTML file in a browser from this local folder.",
+      "headings": [
+        {
+          "id": "missing",
+          "text": "A model is missing",
+          "level": 2
+        },
+        {
+          "id": "service",
+          "text": "The application cannot reach the service",
+          "level": 2
+        },
+        {
+          "id": "download-error",
+          "text": "A download fails",
+          "level": 2
+        },
+        {
+          "id": "offline",
+          "text": "The offline manual does not open",
+          "level": 2
+        }
+      ],
+      "anchors": [],
+      "languages": [],
+      "code": "",
+      "assets": [],
+      "links": [],
+      "kind": "guide"
+    },
+    {
+      "id": "install",
+      "title": "Télécharger un modèle",
+      "description": "Téléchargez depuis Hugging Face ou une adresse HTTPS directe et suivez la tâche dans Activité.",
+      "section": "Catalogue",
+      "parent": "library",
+      "order": 30,
+      "sourceRevision": "1",
+      "locale": "fr",
+      "html": "<h2 id=\"download\">Lancer un téléchargement<a class=\"heading-anchor\" href=\"#/fr/install/download\" aria-label=\"Lien vers Lancer un téléchargement\">#</a></h2><ol>\n<li>Choisissez <strong>Installer…</strong>.</li>\n<li>Pour <strong>Hugging Face</strong>, indiquez le dépôt au format <code>propriétaire/nom</code> et le chemin exact\ndu fichier dans ce dépôt. Si l’accès est restreint, acceptez les conditions du dépôt\navec votre compte Hugging Face et fournissez un jeton Hugging Face autorisé.</li>\n<li>Pour <strong>Adresse</strong>, entrez l’URL HTTPS directe. Lorsque l’éditeur fournit un SHA-256,\nsaisissez-le pour que CyModelHub puisse vérifier le fichier téléchargé.</li>\n<li>Choisissez une destination dans un <a href=\"#/fr/library/locations\">emplacement enregistré</a> puis\ncliquez sur <strong>Télécharger</strong>. Vous pouvez choisir le dossier de stockage de CyModelHub.</li>\n</ol>\n<h2 id=\"progress\">Suivre le téléchargement<a class=\"heading-anchor\" href=\"#/fr/install/progress\" aria-label=\"Lien vers Suivre le téléchargement\">#</a></h2><p>Ouvrez <strong>Activité</strong> pour suivre la progression et consulter les erreurs. Utilisez le bouton\nd’annulation pour arrêter un téléchargement en cours. CyModelHub peut reprendre depuis\nun fichier partiel lorsque le serveur le permet. Une fois téléchargé, le modèle rejoint le\ncatalogue. Sélectionnez son entrée pour copier le chemin et l’utiliser dans votre moteur.</p>\n",
+      "text": "Lancer un téléchargement # Choisissez Installer… . Pour Hugging Face , indiquez le dépôt au format propriétaire/nom et le chemin exact du fichier dans ce dépôt. Si l’accès est restreint, acceptez les conditions du dépôt avec votre compte Hugging Face et fournissez un jeton Hugging Face autorisé. Pour Adresse , entrez l’URL HTTPS directe. Lorsque l’éditeur fournit un SHA-256, saisissez-le pour que CyModelHub puisse vérifier le fichier téléchargé. Choisissez une destination dans un emplacement enregistré puis cliquez sur Télécharger . Vous pouvez choisir le dossier de stockage de CyModelHub. Suivre le téléchargement # Ouvrez Activité pour suivre la progression et consulter les erreurs. Utilisez le bouton d’annulation pour arrêter un téléchargement en cours. CyModelHub peut reprendre depuis un fichier partiel lorsque le serveur le permet. Une fois téléchargé, le modèle rejoint le catalogue. Sélectionnez son entrée pour copier le chemin et l’utiliser dans votre moteur.",
+      "headings": [
+        {
+          "id": "download",
+          "text": "Lancer un téléchargement",
+          "level": 2
+        },
+        {
+          "id": "progress",
+          "text": "Suivre le téléchargement",
+          "level": 2
+        }
+      ],
+      "anchors": [],
+      "languages": [],
+      "code": "",
+      "assets": [],
+      "links": [
+        "#/fr/library/locations"
+      ],
+      "kind": "guide",
+      "revision": "ccd1009d8346"
+    },
+    {
+      "id": "integrate",
+      "title": "Connecter des scripts, applications et assistants",
+      "description": "Retrouvez les chemins des modèles via la ligne de commande, le client C++, HTTP local ou MCP.",
+      "section": "Intégration",
+      "parent": "overview",
+      "order": 40,
+      "sourceRevision": "1",
+      "locale": "fr",
+      "html": "<h2 id=\"cli\">Ligne de commande<a class=\"heading-anchor\" href=\"#/fr/integrate/cli\" aria-label=\"Lien vers Ligne de commande\">#</a></h2><p>Lancez l’outil depuis le dossier d’installation ou ajoutez-le au chemin de recherche des\ncommandes de votre terminal. L’outil et l’application de bureau accèdent au même catalogue\nlorsqu’ils utilisent le même dossier de données.</p>\n<div class=\"code-block\"><div class=\"code-toolbar\"><span>text</span><button type=\"button\" data-copy-code>Copier</button></div><pre><code class=\"language-text\"><span class=\"code-line\" id=\"L1\" data-line=\"1\">CyModelHubCli status</span><span class=\"code-line\" id=\"L2\" data-line=\"2\">CyModelHubCli list --type lora</span><span class=\"code-line\" id=\"L3\" data-line=\"3\">CyModelHubCli where sd_xl_base_1.0</span><span class=\"code-line\" id=\"L4\" data-line=\"4\">CyModelHubCli operations</span></code></pre></div><p><code>where</code> affiche le chemin du fichier ou du dossier qui correspond le mieux. Utilisez\n<code>list --json</code> pour obtenir des données structurées. <code>operations</code> liste toutes les\nopérations et les schémas de leurs paramètres.</p>\n<h2 id=\"cpp\">Client C++<a class=\"heading-anchor\" href=\"#/fr/integrate/cpp\" aria-label=\"Lien vers Client C++\">#</a></h2><p>Le client est sous licence MIT et requiert C++20. Ajoutez le dépôt source de CyModelHub\nà votre projet CMake avec <code>add_subdirectory</code>, puis liez <code>CyModelHub::Client</code>.</p>\n<div class=\"code-block\"><div class=\"code-toolbar\"><span>cpp</span><button type=\"button\" data-copy-code>Copier</button></div><pre><code class=\"language-cpp\"><span class=\"code-line\" id=\"code-2-L1\" data-line=\"1\"><span class=\"token macro property\"><span class=\"token directive-hash\">#</span><span class=\"token directive keyword\">include</span> <span class=\"token string\">&lt;cymodelhub/client.hpp></span></span></span><span class=\"code-line\" id=\"code-2-L2\" data-line=\"2\"> </span><span class=\"code-line\" id=\"code-2-L3\" data-line=\"3\">cymodelhub<span class=\"token double-colon punctuation\">::</span>Client hub<span class=\"token punctuation\">;</span></span><span class=\"code-line\" id=\"code-2-L4\" data-line=\"4\"><span class=\"token keyword\">auto</span> model <span class=\"token operator\">=</span> hub<span class=\"token punctuation\">.</span><span class=\"token function\">resolve</span><span class=\"token punctuation\">(</span><span class=\"token string\">\"sd_xl_base_1.0\"</span><span class=\"token punctuation\">,</span> <span class=\"token string\">\"model\"</span><span class=\"token punctuation\">,</span> <span class=\"token string\">\"image\"</span><span class=\"token punctuation\">)</span><span class=\"token punctuation\">;</span></span><span class=\"code-line\" id=\"code-2-L5\" data-line=\"5\"><span class=\"token keyword\">if</span> <span class=\"token punctuation\">(</span>model<span class=\"token punctuation\">)</span> <span class=\"token punctuation\">{</span></span><span class=\"code-line\" id=\"code-2-L6\" data-line=\"6\">    <span class=\"token keyword\">const</span> <span class=\"token keyword\">auto</span><span class=\"token operator\">&amp;</span> installed_path <span class=\"token operator\">=</span> model<span class=\"token operator\">-></span>path<span class=\"token punctuation\">;</span></span><span class=\"code-line\" id=\"code-2-L7\" data-line=\"7\">    <span class=\"token comment\">// Transmettez installed_path au moteur de votre application.</span></span><span class=\"code-line\" id=\"code-2-L8\" data-line=\"8\"><span class=\"token punctuation\">}</span></span></code></pre></div><p><code>resolve()</code> renvoie une valeur vide en l’absence de résultat. Les erreurs du service\npeuvent être interceptées en tant que <code>cymodelhub::Error</code>. <code>Client::invoke()</code> prend\nle nom d’une opération et ses arguments JSON. Si l’exécutable du service est installé\nailleurs, indiquez son chemin dans <code>CYMODELHUB_SERVICE</code> ou dans <code>cymodelhub::Options</code>.</p>\n<h2 id=\"mcp\">Assistants et HTTP local<a class=\"heading-anchor\" href=\"#/fr/integrate/mcp\" aria-label=\"Lien vers Assistants et HTTP local\">#</a></h2><p>Pour un client MCP compatible HTTP, utilisez <strong>Réglages → Copier la configuration MCP</strong>.\nLa configuration copiée contient un jeton d’accès local. Gardez-le privé. Un client qui\nlance un serveur stdio peut utiliser l’exécutable <code>CyModelHubMcp</code> installé.</p>\n<p>Dans les autres langages, envoyez du JSON à <code>POST &lt;url&gt;/v1</code> avec les en-têtes\n<code>Content-Type: application/json</code> et <code>Authorization: Bearer &lt;token&gt;</code>. L’URL de bouclage\net le jeton se trouvent dans le fichier <code>service.json</code> du dossier de données. Cette\nrequête liste les adaptateurs LoRA installés.</p>\n<div class=\"code-block\"><div class=\"code-toolbar\"><span>json</span><button type=\"button\" data-copy-code>Copier</button></div><pre><code class=\"language-json\"><span class=\"code-line\" id=\"code-3-L1\" data-line=\"1\"><span class=\"token punctuation\">{</span><span class=\"token property\">\"method\"</span><span class=\"token operator\">:</span><span class=\"token string\">\"invoke\"</span><span class=\"token punctuation\">,</span><span class=\"token property\">\"name\"</span><span class=\"token operator\">:</span><span class=\"token string\">\"models_list\"</span><span class=\"token punctuation\">,</span><span class=\"token property\">\"arguments\"</span><span class=\"token operator\">:</span><span class=\"token punctuation\">{</span><span class=\"token property\">\"type\"</span><span class=\"token operator\">:</span><span class=\"token string\">\"lora\"</span><span class=\"token punctuation\">}</span><span class=\"token punctuation\">}</span></span></code></pre></div><p>Les opérations longues, comme <code>install_start</code>, renvoient un identifiant de tâche.\nUtilisez <code>jobs_get</code> pour suivre cette tâche ou <code>Client::wait_job()</code> en C++.</p>\n",
+      "text": "Ligne de commande # Lancez l’outil depuis le dossier d’installation ou ajoutez-le au chemin de recherche des commandes de votre terminal. L’outil et l’application de bureau accèdent au même catalogue lorsqu’ils utilisent le même dossier de données. text Copier CyModelHubCli status CyModelHubCli list --type lora CyModelHubCli where sd_xl_base_1.0 CyModelHubCli operations where affiche le chemin du fichier ou du dossier qui correspond le mieux. Utilisez list --json pour obtenir des données structurées. operations liste toutes les opérations et les schémas de leurs paramètres. Client C++ # Le client est sous licence MIT et requiert C++20. Ajoutez le dépôt source de CyModelHub à votre projet CMake avec add_subdirectory , puis liez CyModelHub::Client . cpp Copier # include <cymodelhub/client.hpp> cymodelhub :: Client hub ; auto model = hub . resolve ( \"sd_xl_base_1.0\" , \"model\" , \"image\" ) ; if ( model ) { const auto & installed_path = model -> path ; // Transmettez installed_path au moteur de votre application. } resolve() renvoie une valeur vide en l’absence de résultat. Les erreurs du service peuvent être interceptées en tant que cymodelhub::Error . Client::invoke() prend le nom d’une opération et ses arguments JSON. Si l’exécutable du service est installé ailleurs, indiquez son chemin dans CYMODELHUB_SERVICE ou dans cymodelhub::Options . Assistants et HTTP local # Pour un client MCP compatible HTTP, utilisez Réglages → Copier la configuration MCP . La configuration copiée contient un jeton d’accès local. Gardez-le privé. Un client qui lance un serveur stdio peut utiliser l’exécutable CyModelHubMcp installé. Dans les autres langages, envoyez du JSON à POST <url>/v1 avec les en-têtes Content-Type: application/json et Authorization: Bearer <token> . L’URL de bouclage et le jeton se trouvent dans le fichier service.json du dossier de données. Cette requête liste les adaptateurs LoRA installés. json Copier { \"method\" : \"invoke\" , \"name\" : \"models_list\" , \"arguments\" : { \"type\" : \"lora\" } } Les opérations longues, comme install_start , renvoient un identifiant de tâche. Utilisez jobs_get pour suivre cette tâche ou Client::wait_job() en C++. CyModelHubCli status CyModelHubCli list --type lora CyModelHubCli where sd_xl_base_1.0 CyModelHubCli operations #include <cymodelhub/client.hpp> cymodelhub::Client hub; auto model = hub.resolve(\"sd_xl_base_1.0\", \"model\", \"image\"); if (model) { const auto& installed_path = model->path; // Transmettez installed_path au moteur de votre application. } {\"method\":\"invoke\",\"name\":\"models_list\",\"arguments\":{\"type\":\"lora\"}}",
+      "headings": [
+        {
+          "id": "cli",
+          "text": "Ligne de commande",
+          "level": 2
+        },
+        {
+          "id": "cpp",
+          "text": "Client C++",
+          "level": 2
+        },
+        {
+          "id": "mcp",
+          "text": "Assistants et HTTP local",
+          "level": 2
+        }
+      ],
+      "anchors": [
+        "L1",
+        "L2",
+        "L3",
+        "L4",
+        "code-2-L1",
+        "code-2-L2",
+        "code-2-L3",
+        "code-2-L4",
+        "code-2-L5",
+        "code-2-L6",
+        "code-2-L7",
+        "code-2-L8",
+        "code-3-L1"
+      ],
+      "languages": [
+        "text",
+        "cpp",
+        "json"
+      ],
+      "code": "CyModelHubCli status\nCyModelHubCli list --type lora\nCyModelHubCli where sd_xl_base_1.0\nCyModelHubCli operations\n#include <cymodelhub/client.hpp>\n\ncymodelhub::Client hub;\nauto model = hub.resolve(\"sd_xl_base_1.0\", \"model\", \"image\");\nif (model) {\n    const auto& installed_path = model->path;\n    // Transmettez installed_path au moteur de votre application.\n}\n{\"method\":\"invoke\",\"name\":\"models_list\",\"arguments\":{\"type\":\"lora\"}}",
+      "assets": [],
+      "links": [],
+      "kind": "guide",
+      "revision": "1af34e964f61"
+    },
+    {
+      "id": "library",
+      "title": "Trouver et enregistrer les modèles",
+      "description": "Choisissez les dossiers surveillés, enregistrez un modèle isolé et filtrez le catalogue.",
+      "section": "Catalogue",
+      "parent": "overview",
+      "order": 10,
+      "sourceRevision": "1",
+      "locale": "fr",
+      "html": "<h2 id=\"locations\">Choisir où chercher<a class=\"heading-anchor\" href=\"#/fr/library/locations\" aria-label=\"Lien vers Choisir où chercher\">#</a></h2><p>Dans <strong>Emplacements</strong>, CyModelHub liste les bibliothèques Hugging Face, Ollama et LM Studio\nqu’il détecte, son propre dossier de stockage et les dossiers que vous enregistrez.\nPour ajouter une bibliothèque, par exemple celle de ComfyUI, choisissez <strong>Ajouter…</strong>,\nsélectionnez le dossier puis cliquez sur <strong>Surveiller ce dossier</strong>. Le service lance son\nanalyse. Pour actualiser un seul emplacement, utilisez son bouton d’analyse dans <strong>Emplacements</strong>.</p>\n<p>Utilisez <strong>Ajouter ce modèle</strong> pour un fichier individuel ou un dossier de pipeline Diffusers,\nTransformers ou MLX situé hors des dossiers surveillés. L’enregistrement d’un modèle existant\nlaisse ses fichiers à leur place.</p>\n<h2 id=\"search\">Rechercher et examiner<a class=\"heading-anchor\" href=\"#/fr/library/search\" aria-label=\"Lien vers Rechercher et examiner\">#</a></h2><p>Utilisez le champ de recherche et les catégories de la barre latérale pour filtrer par\ndomaine, rôle ou provenance. Sélectionnez une entrée pour voir son fichier, son classement et\nses notes. <strong>Ouvrir le dossier</strong> affiche son emplacement. <strong>Copier le chemin</strong> permet de\ntransmettre le chemin à une autre application. Vous pouvez aussi\n<a href=\"#/fr/integrate/cli\">chercher ce chemin depuis un script</a>.</p>\n<h2 id=\"formats\">Formats reconnus<a class=\"heading-anchor\" href=\"#/fr/library/formats\" aria-label=\"Lien vers Formats reconnus\">#</a></h2><p>CyModelHub lit les en-têtes GGUF et safetensors pour relever les informations disponibles,\ncomme l’architecture, la quantification et la longueur de contexte. Un pipeline pris en\ncharge comprenant plusieurs fichiers apparaît comme un seul modèle. D’autres formats peuvent\nêtre classés à partir du nom de fichier et des dossiers qui le contiennent.</p>\n<p>Le catalogue ne charge pas les poids et ne désérialise pas les fichiers pickle. Lorsqu’une\nentrée est signalée comme fichier pickle, utilisez un format de confiance dans votre moteur\nd’exécution. Si le classement automatique est erroné, <a href=\"#/fr/organize/classification\">modifiez la fiche</a>.</p>\n",
+      "text": "Choisir où chercher # Dans Emplacements , CyModelHub liste les bibliothèques Hugging Face, Ollama et LM Studio qu’il détecte, son propre dossier de stockage et les dossiers que vous enregistrez. Pour ajouter une bibliothèque, par exemple celle de ComfyUI, choisissez Ajouter… , sélectionnez le dossier puis cliquez sur Surveiller ce dossier . Le service lance son analyse. Pour actualiser un seul emplacement, utilisez son bouton d’analyse dans Emplacements . Utilisez Ajouter ce modèle pour un fichier individuel ou un dossier de pipeline Diffusers, Transformers ou MLX situé hors des dossiers surveillés. L’enregistrement d’un modèle existant laisse ses fichiers à leur place. Rechercher et examiner # Utilisez le champ de recherche et les catégories de la barre latérale pour filtrer par domaine, rôle ou provenance. Sélectionnez une entrée pour voir son fichier, son classement et ses notes. Ouvrir le dossier affiche son emplacement. Copier le chemin permet de transmettre le chemin à une autre application. Vous pouvez aussi chercher ce chemin depuis un script . Formats reconnus # CyModelHub lit les en-têtes GGUF et safetensors pour relever les informations disponibles, comme l’architecture, la quantification et la longueur de contexte. Un pipeline pris en charge comprenant plusieurs fichiers apparaît comme un seul modèle. D’autres formats peuvent être classés à partir du nom de fichier et des dossiers qui le contiennent. Le catalogue ne charge pas les poids et ne désérialise pas les fichiers pickle. Lorsqu’une entrée est signalée comme fichier pickle, utilisez un format de confiance dans votre moteur d’exécution. Si le classement automatique est erroné, modifiez la fiche .",
+      "headings": [
+        {
+          "id": "locations",
+          "text": "Choisir où chercher",
+          "level": 2
+        },
+        {
+          "id": "search",
+          "text": "Rechercher et examiner",
+          "level": 2
+        },
+        {
+          "id": "formats",
+          "text": "Formats reconnus",
+          "level": 2
+        }
+      ],
+      "anchors": [],
+      "languages": [],
+      "code": "",
+      "assets": [],
+      "links": [
+        "#/fr/integrate/cli",
+        "#/fr/organize/classification"
+      ],
+      "kind": "guide",
+      "revision": "0628d2c95d2d"
+    },
+    {
+      "id": "organize",
+      "title": "Classer, déplacer et partager les modèles",
+      "description": "Corrigez le classement, examinez les doublons et déplacez ou liez des modèles dans les dossiers enregistrés.",
+      "section": "Catalogue",
+      "parent": "library",
+      "order": 20,
+      "sourceRevision": "1",
+      "locale": "fr",
+      "html": "<h2 id=\"classification\">Modifier la fiche d’un modèle<a class=\"heading-anchor\" href=\"#/fr/organize/classification\" aria-label=\"Lien vers Modifier la fiche d’un modèle\">#</a></h2><p>Sélectionnez un modèle. Dans <strong>Classement</strong>, modifiez son nom, son domaine, son rôle\nou sa famille. Vous pouvez aussi ajouter des étiquettes et des notes. Cliquez sur\n<strong>Enregistrer</strong>. L’étoile ajoute le modèle aux <strong>Favoris</strong>. Les analyses suivantes conservent\nvos corrections. <strong>Détecter à nouveau</strong> rétablit le classement détecté pour cette entrée.</p>\n<h2 id=\"duplicates\">Examiner les doublons<a class=\"heading-anchor\" href=\"#/fr/organize/duplicates\" aria-label=\"Lien vers Examiner les doublons\">#</a></h2><p>Ouvrez <strong>Doublons</strong> pour voir les fichiers au contenu identique et l’espace estimé des\ncopies supplémentaires. Depuis chaque ligne, vous pouvez ouvrir le dossier ou la fiche\ndu modèle correspondant.</p>\n<figure data-cydoc-module=\"image\" data-cydoc-id=\"duplicate-list\" data-config=\"{&quot;id&quot;:&quot;duplicate-list&quot;,&quot;src&quot;:&quot;assets/duplicates.fr.png&quot;,&quot;alt&quot;:&quot;Deux modèles de démonstration identiques dans des dossiers différents, sur la page Doublons&quot;,&quot;controls&quot;:&quot;minimal&quot;}\"><img src=\"assets/duplicates.fr.png\" alt=\"Deux modèles de démonstration identiques dans des dossiers différents, sur la page Doublons\" loading=\"lazy\" decoding=\"async\"></figure><p>Dans la fiche du modèle, <strong>Fichier → SHA-256 → Calculer</strong> lance un calcul dont vous pouvez\nsuivre l’avancement dans <strong>Activité</strong>. <strong>Oublier cette entrée</strong> retire la fiche, ses étiquettes\net ses notes du catalogue. Une analyse peut retrouver le modèle s’il est dans un dossier surveillé.</p>\n<h2 id=\"share\">Déplacer ou lier un modèle<a class=\"heading-anchor\" href=\"#/fr/organize/share\" aria-label=\"Lien vers Déplacer ou lier un modèle\">#</a></h2><p>Ouvrez <strong>Partager et déplacer</strong> dans la fiche. Choisissez <strong>Déplacer…</strong> pour libérer de\nl’espace à l’emplacement d’origine. Entre deux disques, le service copie et vérifie le modèle\navant de terminer le déplacement. Laissez <strong>Laisser un lien à l’ancien emplacement</strong> activé\nsi un autre logiciel utilise encore l’ancien chemin.</p>\n<p>Choisissez <strong>Lier dans un dossier…</strong> pour qu’une autre application voie le modèle sans\ncopie supplémentaire. Un lien physique nécessite un fichier sur le même système de fichiers.\nUn lien symbolique peut traverser les disques si le système le permet. Enregistrez le dossier\nde destination dans <a href=\"#/fr/library/locations\">Emplacements</a> avant d’y déplacer, lier ou\ntélécharger un modèle.</p>\n",
+      "text": "Modifier la fiche d’un modèle # Sélectionnez un modèle. Dans Classement , modifiez son nom, son domaine, son rôle ou sa famille. Vous pouvez aussi ajouter des étiquettes et des notes. Cliquez sur Enregistrer . L’étoile ajoute le modèle aux Favoris . Les analyses suivantes conservent vos corrections. Détecter à nouveau rétablit le classement détecté pour cette entrée. Examiner les doublons # Ouvrez Doublons pour voir les fichiers au contenu identique et l’espace estimé des copies supplémentaires. Depuis chaque ligne, vous pouvez ouvrir le dossier ou la fiche du modèle correspondant. Dans la fiche du modèle, Fichier → SHA-256 → Calculer lance un calcul dont vous pouvez suivre l’avancement dans Activité . Oublier cette entrée retire la fiche, ses étiquettes et ses notes du catalogue. Une analyse peut retrouver le modèle s’il est dans un dossier surveillé. Déplacer ou lier un modèle # Ouvrez Partager et déplacer dans la fiche. Choisissez Déplacer… pour libérer de l’espace à l’emplacement d’origine. Entre deux disques, le service copie et vérifie le modèle avant de terminer le déplacement. Laissez Laisser un lien à l’ancien emplacement activé si un autre logiciel utilise encore l’ancien chemin. Choisissez Lier dans un dossier… pour qu’une autre application voie le modèle sans copie supplémentaire. Un lien physique nécessite un fichier sur le même système de fichiers. Un lien symbolique peut traverser les disques si le système le permet. Enregistrez le dossier de destination dans Emplacements avant d’y déplacer, lier ou télécharger un modèle.",
+      "headings": [
+        {
+          "id": "classification",
+          "text": "Modifier la fiche d’un modèle",
+          "level": 2
+        },
+        {
+          "id": "duplicates",
+          "text": "Examiner les doublons",
+          "level": 2
+        },
+        {
+          "id": "share",
+          "text": "Déplacer ou lier un modèle",
+          "level": 2
+        }
+      ],
+      "anchors": [],
+      "languages": [],
+      "code": "",
+      "assets": [
+        "assets/duplicates.fr.png"
+      ],
+      "links": [
+        "#/fr/library/locations"
+      ],
+      "kind": "media",
+      "revision": "c87f087c2843"
+    },
+    {
+      "id": "overview",
+      "title": "Premiers pas avec CyModelHub",
+      "description": "Ouvrez CyModelHub, repérez vos modèles déjà installés et retrouvez le fichier recherché.",
+      "section": "CyModelHub",
+      "order": 0,
+      "sourceRevision": "1",
+      "locale": "fr",
+      "html": "<h2 id=\"start\">Ouvrir CyModelHub<a class=\"heading-anchor\" href=\"#/fr/overview/start\" aria-label=\"Lien vers Ouvrir CyModelHub\">#</a></h2><p>CyModelHub tient un catalogue des modèles d’IA déjà présents sur votre ordinateur.\nL’application de bureau, la ligne de commande et la bibliothèque cliente utilisent le même\nservice local. Une fois le modèle installé ou enregistré, vos applications peuvent demander son chemin.</p>\n<p>Sous Windows, conservez les fichiers installés ensemble et lancez <code>CyModelHub.exe</code>.\nL’application démarre le service au besoin. Cette version a été vérifiée sous Windows x64.\nLinux et macOS sont des cibles qui restent à compiler et à tester.</p>\n<p>Appuyez sur <strong>F1</strong> ou choisissez <strong>Réglages → Manuel utilisateur (F1)</strong> pour ouvrir ce manuel.\nDepuis une copie locale du dépôt ou du dossier installé, vous pouvez aussi ouvrir\n<code>Documentation/Documentation.html</code> directement. Laissez le dossier <code>DocData</code> à côté du fichier.</p>\n<h2 id=\"first-scan\">Trouver votre premier modèle<a class=\"heading-anchor\" href=\"#/fr/overview/first-scan\" aria-label=\"Lien vers Trouver votre premier modèle\">#</a></h2><ol>\n<li>Ouvrez <strong>Emplacements</strong> pour voir les bibliothèques détectées sur cet ordinateur.</li>\n<li>Choisissez <strong>Ajouter… → Surveiller ce dossier</strong> pour une bibliothèque rangée ailleurs,\nou <strong>Ajouter ce modèle</strong> pour enregistrer un fichier ou un dossier de pipeline.</li>\n<li>Cliquez sur <strong>Analyser</strong> ou appuyez sur <strong>F5</strong> pour actualiser le catalogue.\nSélectionnez un modèle pour voir son classement et les détails de son fichier.</li>\n</ol>\n<figure data-cydoc-module=\"image\" data-cydoc-id=\"model-list\" data-config=\"{&quot;id&quot;:&quot;model-list&quot;,&quot;src&quot;:&quot;assets/models.fr.png&quot;,&quot;alt&quot;:&quot;Catalogue CyModelHub avec la liste des modèles et la fiche du modèle sélectionné&quot;,&quot;controls&quot;:&quot;minimal&quot;}\"><img src=\"assets/models.fr.png\" alt=\"Catalogue CyModelHub avec la liste des modèles et la fiche du modèle sélectionné\" loading=\"lazy\" decoding=\"async\"></figure><h2 id=\"next\">Continuer<a class=\"heading-anchor\" href=\"#/fr/overview/next\" aria-label=\"Lien vers Continuer\">#</a></h2><ul>\n<li><a href=\"#/fr/library/locations\">Trouver et enregistrer des modèles installés</a></li>\n<li><a href=\"#/fr/organize/classification\">Classer, déplacer et partager des modèles</a></li>\n<li><a href=\"#/fr/install/download\">Télécharger un modèle</a></li>\n<li><a href=\"#/fr/integrate/cli\">Connecter des scripts, des applications et des assistants</a></li>\n<li><a href=\"#/fr/troubleshoot/missing\">Dépanner le catalogue ou le service</a></li>\n</ul>\n",
+      "text": "Ouvrir CyModelHub # CyModelHub tient un catalogue des modèles d’IA déjà présents sur votre ordinateur. L’application de bureau, la ligne de commande et la bibliothèque cliente utilisent le même service local. Une fois le modèle installé ou enregistré, vos applications peuvent demander son chemin. Sous Windows, conservez les fichiers installés ensemble et lancez CyModelHub.exe . L’application démarre le service au besoin. Cette version a été vérifiée sous Windows x64. Linux et macOS sont des cibles qui restent à compiler et à tester. Appuyez sur F1 ou choisissez Réglages → Manuel utilisateur (F1) pour ouvrir ce manuel. Depuis une copie locale du dépôt ou du dossier installé, vous pouvez aussi ouvrir Documentation/Documentation.html directement. Laissez le dossier DocData à côté du fichier. Trouver votre premier modèle # Ouvrez Emplacements pour voir les bibliothèques détectées sur cet ordinateur. Choisissez Ajouter… → Surveiller ce dossier pour une bibliothèque rangée ailleurs, ou Ajouter ce modèle pour enregistrer un fichier ou un dossier de pipeline. Cliquez sur Analyser ou appuyez sur F5 pour actualiser le catalogue. Sélectionnez un modèle pour voir son classement et les détails de son fichier. Continuer # Trouver et enregistrer des modèles installés Classer, déplacer et partager des modèles Télécharger un modèle Connecter des scripts, des applications et des assistants Dépanner le catalogue ou le service",
+      "headings": [
+        {
+          "id": "start",
+          "text": "Ouvrir CyModelHub",
+          "level": 2
+        },
+        {
+          "id": "first-scan",
+          "text": "Trouver votre premier modèle",
+          "level": 2
+        },
+        {
+          "id": "next",
+          "text": "Continuer",
+          "level": 2
+        }
+      ],
+      "anchors": [],
+      "languages": [],
+      "code": "",
+      "assets": [
+        "assets/models.fr.png"
+      ],
+      "links": [
+        "#/fr/library/locations",
+        "#/fr/organize/classification",
+        "#/fr/install/download",
+        "#/fr/integrate/cli",
+        "#/fr/troubleshoot/missing"
+      ],
+      "kind": "media",
+      "revision": "e9f5f2984d15"
+    },
+    {
+      "id": "troubleshoot",
+      "title": "Dépanner CyModelHub",
+      "description": "Retrouvez les entrées manquantes et diagnostiquez les erreurs de service ou de téléchargement.",
+      "section": "Aide",
+      "parent": "overview",
+      "order": 50,
+      "sourceRevision": "1",
+      "locale": "fr",
+      "html": "<h2 id=\"missing\">Un modèle manque<a class=\"heading-anchor\" href=\"#/fr/troubleshoot/missing\" aria-label=\"Lien vers Un modèle manque\">#</a></h2><p>Vérifiez que le disque est monté, puis que le dossier est présent et activé dans\n<strong>Emplacements</strong>. Lancez une analyse avec <strong>F5</strong> et effacez la recherche et les filtres.\nSi vous aviez enregistré le fichier à la main avant de le déplacer, ajoutez son nouveau\nchemin et oubliez l’ancienne entrée. Dans un dossier surveillé, une analyse peut retrouver\nle modèle à son nouvel emplacement.</p>\n<h2 id=\"service\">L’application ne joint pas le service<a class=\"heading-anchor\" href=\"#/fr/troubleshoot/service\" aria-label=\"Lien vers L’application ne joint pas le service\">#</a></h2><p>Lancez <code>CyModelHubCli status</code> depuis le dossier d’installation. Vérifiez que\n<code>CyModelHubService</code> se trouve à côté du programme client ou indiquez le chemin de\nl’exécutable avec <code>CYMODELHUB_SERVICE</code>. Si vous utilisez <code>--data</code>, passez le même dossier à\nl’application et à l’outil en ligne de commande. Vous pouvez arrêter l’instance pour ce\ndossier avec <code>CyModelHubCli stop</code>, puis rouvrir l’application pour redémarrer le service.</p>\n<h2 id=\"download-error\">Un téléchargement échoue<a class=\"heading-anchor\" href=\"#/fr/troubleshoot/download-error\" aria-label=\"Lien vers Un téléchargement échoue\">#</a></h2><p>Ouvrez <strong>Activité</strong> pour lire l’erreur. Vérifiez le chemin du fichier dans le dépôt ou son\nadresse HTTPS, l’espace disque disponible et les droits d’écriture dans la destination\nenregistrée. Pour un dépôt à accès restreint, vérifiez vos droits sur Hugging Face.\nSi le contrôle d’intégrité échoue, comparez le SHA-256 saisi à la valeur publiée avant\nde réessayer.</p>\n<h2 id=\"offline\">Le manuel hors ligne ne s’ouvre pas<a class=\"heading-anchor\" href=\"#/fr/troubleshoot/offline\" aria-label=\"Lien vers Le manuel hors ligne ne s’ouvre pas\">#</a></h2><p>Gardez <code>Documentation.html</code> et le dossier <code>DocData</code> complet dans le même dossier\n<code>Documentation</code>. Ouvrez le fichier HTML depuis ce dossier local dans un navigateur.</p>\n",
+      "text": "Un modèle manque # Vérifiez que le disque est monté, puis que le dossier est présent et activé dans Emplacements . Lancez une analyse avec F5 et effacez la recherche et les filtres. Si vous aviez enregistré le fichier à la main avant de le déplacer, ajoutez son nouveau chemin et oubliez l’ancienne entrée. Dans un dossier surveillé, une analyse peut retrouver le modèle à son nouvel emplacement. L’application ne joint pas le service # Lancez CyModelHubCli status depuis le dossier d’installation. Vérifiez que CyModelHubService se trouve à côté du programme client ou indiquez le chemin de l’exécutable avec CYMODELHUB_SERVICE . Si vous utilisez --data , passez le même dossier à l’application et à l’outil en ligne de commande. Vous pouvez arrêter l’instance pour ce dossier avec CyModelHubCli stop , puis rouvrir l’application pour redémarrer le service. Un téléchargement échoue # Ouvrez Activité pour lire l’erreur. Vérifiez le chemin du fichier dans le dépôt ou son adresse HTTPS, l’espace disque disponible et les droits d’écriture dans la destination enregistrée. Pour un dépôt à accès restreint, vérifiez vos droits sur Hugging Face. Si le contrôle d’intégrité échoue, comparez le SHA-256 saisi à la valeur publiée avant de réessayer. Le manuel hors ligne ne s’ouvre pas # Gardez Documentation.html et le dossier DocData complet dans le même dossier Documentation . Ouvrez le fichier HTML depuis ce dossier local dans un navigateur.",
+      "headings": [
+        {
+          "id": "missing",
+          "text": "Un modèle manque",
+          "level": 2
+        },
+        {
+          "id": "service",
+          "text": "L’application ne joint pas le service",
+          "level": 2
+        },
+        {
+          "id": "download-error",
+          "text": "Un téléchargement échoue",
+          "level": 2
+        },
+        {
+          "id": "offline",
+          "text": "Le manuel hors ligne ne s’ouvre pas",
+          "level": 2
+        }
+      ],
+      "anchors": [],
+      "languages": [],
+      "code": "",
+      "assets": [],
+      "links": [],
+      "kind": "guide",
+      "revision": "ad84432ccec0"
+    }
+  ]
+}

@@ -146,7 +146,11 @@ if(CYMODELHUB_BUILD_APP)
             MACOSX_BUNDLE_BUNDLE_NAME CyModelHub MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
             MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}")
     endif()
-    add_dependencies(CyModelHub CyModelHubService CyModelHubMcp)
+    set(manual_dir "${CMAKE_CURRENT_SOURCE_DIR}/Documentation")
+    add_custom_target(CyModelHub_manual
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${manual_dir}" "$<TARGET_FILE_DIR:CyModelHub>/Documentation"
+        VERBATIM)
+    add_dependencies(CyModelHub CyModelHubService CyModelHubMcp CyModelHub_manual)
 
     # Interface languages are plain JSON files next to the executable: add a file to add a language.
     add_custom_command(TARGET CyModelHub POST_BUILD
@@ -177,6 +181,10 @@ if(CYMODELHUB_BUILD_APP)
     endif()
 
     install(TARGETS CyModelHub RUNTIME DESTINATION . COMPONENT Hub BUNDLE DESTINATION . COMPONENT Hub)
+    if(APPLE)
+        install(DIRECTORY "${manual_dir}" DESTINATION "CyModelHub.app/Contents/Resources" COMPONENT Hub)
+    endif()
+    install(DIRECTORY "${manual_dir}" docs DESTINATION . COMPONENT Hub)
     install(DIRECTORY locales DESTINATION . COMPONENT Hub)
     install(DIRECTORY "$<TARGET_FILE_DIR:CyModelHub>/licenses" DESTINATION . COMPONENT Hub)
     install(FILES LICENSE LICENSE-MIT README.md README.fr.md BUILD.md VERSION.md VERSION.fr.md DESTINATION .

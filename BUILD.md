@@ -34,6 +34,19 @@ its CMake and its Ninja, and uses sibling checkouts when they exist.
 ./scripts/build.ps1 -NoApp     # sans l'application / without the desktop application
 ```
 
+Pour installer la version de bureau dans `stage`, utilisez le CMake livré avec Visual Studio.
+To install the desktop build in `stage`, use the CMake shipped with Visual Studio.
+
+```powershell
+$vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+$cyModelHubVS = & $vswhere -latest -version '[17.0,18.0)' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+$cyModelHubCMake = Join-Path $cyModelHubVS 'Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe'
+& $cyModelHubCMake --install build/release --component Hub --prefix stage
+```
+
+Lancez `stage/CyModelHub.exe` et ouvrez le manuel avec **F1**.
+Run `stage/CyModelHub.exe` and press **F1** to open the manual.
+
 Ou à la main / Or by hand:
 
 ```powershell

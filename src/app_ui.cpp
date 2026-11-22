@@ -91,12 +91,10 @@ std::string joined(const std::vector<std::string>& values) {
     return result;
 }
 
-// Show a folder in the system file manager.
-void reveal(const fs::path& path) {
-    std::error_code error;
-    const auto folder = fs::is_directory(path, error) ? path : path.parent_path();
-    std::string url = "file:///";
-    for (const unsigned char c : folder.generic_u8string()) {
+std::string file_url(const fs::path& path) {
+    const auto utf8 = path.generic_u8string();
+    std::string url = utf8.starts_with(u8"//") ? "file:" : utf8.starts_with(u8"/") ? "file://" : "file:///";
+    for (const unsigned char c : utf8) {
         if (std::isalnum(c) || c == '/' || c == ':' || c == '-' || c == '_' || c == '.' || c == '~') {
             url += static_cast<char>(c);
         } else {
@@ -105,7 +103,14 @@ void reveal(const fs::path& path) {
             url += encoded;
         }
     }
-    SDL_OpenURL(url.c_str());
+    return url;
+}
+
+// Show a folder in the system file manager.
+void reveal(const fs::path& path) {
+    std::error_code error;
+    const auto folder = fs::is_directory(path, error) ? path : path.parent_path();
+    SDL_OpenURL(file_url(folder).c_str());
 }
 
 // Native file dialogs answer later, possibly on another thread.
@@ -192,9 +197,35 @@ struct Ui::Impl {
     int install_mode = 0, destination = 0, link_mode = 0;
     char install_repository[256]{}, install_file[512]{}, install_url[1024]{}, install_sha[80]{},
         install_token[256]{}, subfolder[256]{};
-    bool leave_link = true, preset_select = false;
+    bool leave_link = true, preset_select = false, capture_relative_paths = false;
 
     Impl(Data& d, Settings& s, SDL_Window* w) : data(d), settings(s), window(w) {}
+
+    void open_manual() {
+        const auto directory = modelhub::executable_path().parent_path();
+        const auto relative = fs::path("Documentation") / "Documentation.html";
+        auto manual = directory / relative;
+        std::error_code error;
+        if (!fs::is_regular_file(manual, error))
+            manual = directory.parent_path() / "Resources" / relative;
+        const auto route = cyui::locale() == "fr" ? "#/fr/overview" : "#/en/overview";
+        if (!fs::is_regular_file(manual, error) || !SDL_OpenURL((file_url(manual) + route).c_str()))
+            cyui::notify(T("Could not open the user manual").c_str(), cyui::Tone::error);
+    }
+
+    std::string model_path_label(const Json& record) const {
+        const auto path = record.value("path", std::string());
+        if (!capture_relative_paths || path.empty()) return path;
+        const auto file = modelhub::from_utf8(path);
+        const auto root_id = record.value("root", std::string());
+        for (const auto& root : snap->roots) {
+            if (root_id.empty() || root.value("id", std::string()) != root_id) continue;
+            const auto relative = file.lexically_relative(modelhub::from_utf8(root.value("path", std::string())));
+            if (!relative.empty() && relative != "." && *relative.begin() != "..") return modelhub::to_utf8(relative);
+            break;
+        }
+        return modelhub::to_utf8(file.filename());
+    }
 
     // ---- Service requests ------------------------------------------------------------------
 
@@ -296,6 +327,7 @@ struct Ui::Impl {
         cyui::endTopBar();
         if (ImGui::IsKeyPressed(ImGuiKey_F5, false) && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopup))
             invoke("Scan started", "scan_start");
+        if (ImGui::IsKeyPressed(ImGuiKey_F1, false)) open_manual();
     }
 
     const Json* running_job() const {
@@ -626,8 +658,8 @@ struct Ui::Impl {
 
         if (cyui::beginSection(L("File").c_str())) {
             if (cyui::beginProperties("##file", 120.0f)) {
-                cyui::property(T("Path").c_str());
-                wrapped_mono(modelhub::to_utf8(path));
+                cyui::property((capture_relative_paths ? T("Relative path") : T("Path")).c_str());
+                wrapped_mono(model_path_label(record));
                 cyui::property(T("Size").c_str());
                 auto size = human_size(record.value("size", std::uint64_t{0}));
                 if (record.value("folder", false))
@@ -792,7 +824,7 @@ struct Ui::Impl {
                         select(member.value("id", std::string()));
                     }
                     ImGui::SameLine();
-                    wrapped_mono(member.value("path", std::string()));
+                    wrapped_mono(model_path_label(member));
                 }
             }
             cyui::endCard();
@@ -1104,6 +1136,8 @@ struct Ui::Impl {
                      });
         cyui::space(6.0f);
         cyui::textFaint("%s  %s", T("Data folder:").c_str(), snap->status.value("dataDirectory", std::string()).c_str());
+        cyui::space(6.0f);
+        if (cyui::button(L("User manual (F1)").c_str())) open_manual();
         if (cyui::modalButtons("Close", nullptr) != 0) show_settings = false;
         cyui::endModal();
     }
@@ -1170,11 +1204,12 @@ bool Ui::animating() const {
     return impl_->running_job() != nullptr;
 }
 
-void Ui::preset(int page, bool select_first, const std::string& dialog) {
+void Ui::preset(int page, bool select_first, const std::string& dialog, bool relative_paths) {
     impl_->page = page;
     impl_->preset_select = select_first;
     impl_->show_add = dialog == "add";
     impl_->show_install = dialog == "install";
     impl_->show_settings = dialog == "settings";
+    impl_->capture_relative_paths = relative_paths;
 }
 } // namespace app

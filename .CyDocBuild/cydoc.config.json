@@ -1,0 +1,15 @@
+{
+  "$comment": "SPDX-License-Identifier: GPL-3.0-only",
+  "name": "CyModelHub",
+  "version": "0.1.0",
+  "defaultLocale": "en",
+  "locales": [
+    { "code": "en", "label": "English" },
+    { "code": "fr", "label": "Français" }
+  ],
+  "homePage": "overview",
+  "content": "manual",
+  "assets": "assets",
+  "modules": ["image"],
+  "out": "../Documentation"
+}

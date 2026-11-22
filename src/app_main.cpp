@@ -19,7 +19,7 @@ namespace {
 struct Arguments {
     std::string locale, theme, capture, dialog, data;
     int page = 0;
-    bool select = false, help = false;
+    bool select = false, capture_relative_paths = false, help = false;
 };
 
 Arguments parse(int argc, char** argv) {
@@ -34,6 +34,7 @@ Arguments parse(int argc, char** argv) {
         else if (word == "--dialog") arguments.dialog = value();
         else if (word == "--page") arguments.page = std::atoi(value().c_str());
         else if (word == "--select") arguments.select = true;
+        else if (word == "--capture-relative-paths") arguments.capture_relative_paths = true;
         else arguments.help = true;
     }
     return arguments;
@@ -94,7 +95,8 @@ void run(const Arguments& arguments) {
     {
         app::Data data;
         app::Ui ui(data, settings, window.get());
-        ui.preset(arguments.page, arguments.select, arguments.dialog);
+        ui.preset(arguments.page, arguments.select, arguments.dialog,
+                  !arguments.capture.empty() && arguments.capture_relative_paths);
         int frame = 0, settled = 0;
         for (bool running = true; running;) {
             SDL_Event event{};

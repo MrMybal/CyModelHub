@@ -1,6 +1,7 @@
 <table width="100%">
   <tr>
     <td width="300" align="left" valign="top">
+      <a href="Documentation/Documentation.html#/fr/overview">Manuel utilisateur</a><br>
       <a href="BUILD.md">Compilation</a><br>
       <a href="docs/API.md">Opérations du service</a><br>
       <a href="VERSION.fr.md">Notes de version</a><br><br>
@@ -13,7 +14,7 @@
     <td width="300" align="right" valign="top">
       <p><sub>Licence</sub><br><a href="LICENSE"><strong>GPL-3.0-only</strong></a><br><sub>bibliothèque cliente : <a href="LICENSE-MIT">MIT</a></sub></p>
       <p><sub>Version</sub><br><a href="VERSION.fr.md"><strong>0.1.0</strong></a><br><strong>EN DÉVELOPPEMENT</strong></p>
-      <p><sub>Plateformes</sub><br>Windows · Linux · macOS</p>
+      <p><sub>Plateforme vérifiée</sub><br>Windows x64</p>
     </td>
   </tr>
 </table>
@@ -124,13 +125,26 @@ dans [locales](locales). Pour ajouter une langue, copiez `fr.json`, traduisez le
 déposez le fichier à côté des autres : il apparaît dans **Réglages → Langue**.
 `python scripts/check_locales.py` liste les entrées manquantes.
 
+---
+
+## Installation
+
+Suivez les [étapes de compilation et d’installation Windows](BUILD.md#windows), puis lancez `CyModelHub.exe`
+dans le dossier installé. Le service démarre au besoin. Appuyez sur **F1** ou choisissez
+**Réglages → Manuel utilisateur (F1)** pour consulter le manuel bilingue hors ligne.
+Vous pouvez aussi ouvrir [Documentation.html](Documentation/Documentation.html#/fr/overview)
+depuis une copie locale du dépôt ou du dossier installé. Laissez `DocData` à côté du fichier HTML.
+
 ## Compilation
 
 ```powershell
 ./scripts/build.ps1        # Windows : service, client, CLI, relais MCP, application, tests
 ```
 
-[Instructions pour Windows, Linux et macOS](BUILD.md).
+Les [instructions pour Windows, Linux et macOS](BUILD.md) expliquent comment utiliser le
+CMake livré avec Visual Studio s’il est absent de votre `PATH`.
+
+---
 
 ## Licence
 
@@ -139,12 +153,24 @@ Copyright (c) 2026 Cyberalien.
 - **Le service, l'application de bureau, l'outil en ligne de commande et le relais MCP** sont
   distribués sous licence [GPL-3.0-only](LICENSE).
 - **La bibliothèque cliente** — `include/cymodelhub/client.hpp`, `src/client.cpp`,
-  `src/platform.*`, le script de compilation et `examples/client` — est distribuée sous licence
+  `src/platform.*`, le fichier `CMakeLists.txt` à la racine et `examples/client` — est distribuée sous licence
   [MIT](LICENSE-MIT). Toute application, libre ou propriétaire, peut la lier selon les
   termes de la licence MIT ; elle joint le service comme un programme distinct, en HTTP local.
   Conservez la mention de copyright et de permission dans votre distribution.
 
-Chaque fichier source indique sa licence dans sa ligne `SPDX-License-Identifier`. CyModelHub
-s'appuie sur CyUI (MIT), CyMCPSDK (MIT), Dear ImGui (MIT),
-SDL (zlib), nlohmann/json (MIT), cpp-httplib (MIT) et PicoSHA2 (MIT) ; leurs licences sont
-copiées à côté de l'application lors de la compilation.
+### Composants tiers
+
+La compilation de l’application de bureau copie les notices de ses dépendances dans `licenses/`.
+La notice du lecteur hors ligne se trouve dans `Documentation/DocData/`.
+
+| Composant | Licence | Utilisation |
+| --- | --- | --- |
+| [CyUI](https://github.com/MrMybal/CyUI) | [MIT](https://github.com/MrMybal/CyUI/blob/e8ccec0a96ed820fc46e86059e010efafcef687e/LICENSE) | Composants de l’interface de bureau |
+| [Dear ImGui](https://github.com/ocornut/imgui) | [MIT](https://github.com/ocornut/imgui/blob/master/LICENSE.txt) | Interface en mode immédiat et intégration SDL3 |
+| [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) | [OFL-1.1](https://github.com/JetBrains/JetBrainsMono/blob/master/OFL.txt) | Police à chasse fixe fournie par CyUI |
+| [SDL3](https://github.com/libsdl-org/SDL) | [Zlib](https://github.com/libsdl-org/SDL/blob/683181b47cfabd293e3ea409f838915b8297a4fd/LICENSE.txt) | Fenêtre, entrées et rendu de l’application |
+| [CyMCPSDK](https://github.com/MrMybal/CyMCPSDK) | [MIT](https://github.com/MrMybal/CyMCPSDK/blob/e562c731a146d599e3404718ea8414bb5b96b66d/LICENSE) | Transport HTTP local, JSON et MCP |
+| [nlohmann/json](https://github.com/nlohmann/json) | [MIT](https://github.com/nlohmann/json/blob/v3.12.0/LICENSE.MIT) | Types JSON et sérialisation via CyMCPSDK |
+| [cpp-httplib](https://github.com/yhirose/cpp-httplib) | [MIT](https://github.com/yhirose/cpp-httplib/blob/master/LICENSE) | Client et serveur HTTP local via CyMCPSDK |
+| [PicoSHA2](https://github.com/okdshin/PicoSHA2) | [MIT](https://github.com/okdshin/PicoSHA2/blob/master/LICENSE) | Vérification SHA-256 |
+| [CyDoc](https://github.com/MrMybal/CyDoc) | [MIT](Documentation/DocData/CyDoc.LICENSE.txt) | Génération et lecture du manuel hors ligne |

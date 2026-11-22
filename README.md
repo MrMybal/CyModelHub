@@ -1,6 +1,7 @@
 <table width="100%">
   <tr>
     <td width="300" align="left" valign="top">
+      <a href="Documentation/Documentation.html#/en/overview">User manual</a><br>
       <a href="BUILD.md">Build</a><br>
       <a href="docs/API.md">Service operations</a><br>
       <a href="VERSION.md">Release notes</a><br><br>
@@ -13,7 +14,7 @@
     <td width="300" align="right" valign="top">
       <p><sub>License</sub><br><a href="LICENSE"><strong>GPL-3.0-only</strong></a><br><sub>client library: <a href="LICENSE-MIT">MIT</a></sub></p>
       <p><sub>Version</sub><br><a href="VERSION.md"><strong>0.1.0</strong></a><br><strong>IN DEVELOPMENT</strong></p>
-      <p><sub>Platforms</sub><br>Windows · Linux · macOS</p>
+      <p><sub>Verified platform</sub><br>Windows x64</p>
     </td>
   </tr>
 </table>
@@ -117,13 +118,26 @@ The interface text is English in the source and translated by plain JSON files i
 file next to the others: it appears in **Settings → Language**.
 `python scripts/check_locales.py` lists missing entries.
 
+---
+
+## Installation
+
+Follow the [Windows build and installation steps](BUILD.md#windows), then run `CyModelHub.exe` in the installed
+folder. The service starts when needed. Press **F1** or choose **Settings → User manual (F1)**
+to open the bilingual offline manual. You can also open
+[Documentation.html](Documentation/Documentation.html#/en/overview) from a local copy of the
+repository or the installed folder. Keep `DocData` beside the HTML file.
+
 ## Build
 
 ```powershell
 ./scripts/build.ps1        # Windows: service, client, CLI, MCP relay, application, tests
 ```
 
-[Build instructions for Windows, Linux and macOS](BUILD.md).
+[Build instructions for Windows, Linux and macOS](BUILD.md) explain how to use the CMake
+shipped with Visual Studio when it is outside your `PATH`.
+
+---
 
 ## License
 
@@ -132,11 +146,24 @@ Copyright (c) 2026 Cyberalien.
 - **The service, the desktop application, the command line tool and the MCP relay** are
   licensed under [GPL-3.0-only](LICENSE).
 - **The client library** — `include/cymodelhub/client.hpp`, `src/client.cpp`, `src/platform.*`,
-  the build script and `examples/client` — is licensed under [MIT](LICENSE-MIT). Any
+  the root `CMakeLists.txt` and `examples/client` — is licensed under [MIT](LICENSE-MIT). Any
   application, open or closed, may link it under the MIT terms; it reaches the service as a
   separate program, over local HTTP. Keep the copyright and permission notice with your
   distribution.
 
-Each source file states its license in its `SPDX-License-Identifier` line. CyModelHub builds on CyUI (MIT), CyMCPSDK (MIT), Dear ImGui (MIT),
-SDL (zlib), nlohmann/json (MIT), cpp-httplib (MIT) and PicoSHA2 (MIT); their licenses are
-copied next to the application at build time.
+### Third-party components
+
+The desktop build copies its dependency notices into `licenses/`. The offline reader ships
+its own notice in `Documentation/DocData/`.
+
+| Component | License | Use |
+| --- | --- | --- |
+| [CyUI](https://github.com/MrMybal/CyUI) | [MIT](https://github.com/MrMybal/CyUI/blob/e8ccec0a96ed820fc46e86059e010efafcef687e/LICENSE) | Desktop UI components |
+| [Dear ImGui](https://github.com/ocornut/imgui) | [MIT](https://github.com/ocornut/imgui/blob/master/LICENSE.txt) | Immediate-mode UI and SDL3 backends |
+| [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) | [OFL-1.1](https://github.com/JetBrains/JetBrainsMono/blob/master/OFL.txt) | Monospaced font supplied by CyUI |
+| [SDL3](https://github.com/libsdl-org/SDL) | [Zlib](https://github.com/libsdl-org/SDL/blob/683181b47cfabd293e3ea409f838915b8297a4fd/LICENSE.txt) | Desktop window, input and rendering |
+| [CyMCPSDK](https://github.com/MrMybal/CyMCPSDK) | [MIT](https://github.com/MrMybal/CyMCPSDK/blob/e562c731a146d599e3404718ea8414bb5b96b66d/LICENSE) | Local HTTP, JSON, and MCP transport |
+| [nlohmann/json](https://github.com/nlohmann/json) | [MIT](https://github.com/nlohmann/json/blob/v3.12.0/LICENSE.MIT) | JSON types and serialization via CyMCPSDK |
+| [cpp-httplib](https://github.com/yhirose/cpp-httplib) | [MIT](https://github.com/yhirose/cpp-httplib/blob/master/LICENSE) | Local HTTP client and server via CyMCPSDK |
+| [PicoSHA2](https://github.com/okdshin/PicoSHA2) | [MIT](https://github.com/okdshin/PicoSHA2/blob/master/LICENSE) | SHA-256 verification |
+| [CyDoc](https://github.com/MrMybal/CyDoc) | [MIT](Documentation/DocData/CyDoc.LICENSE.txt) | Offline documentation generator and reader |

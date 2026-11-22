@@ -25,6 +25,6 @@ class Ui {
     // True while something moves on screen (a job runs), so the host keeps redrawing.
     bool animating() const;
     // Used by --capture to render a given screen without interaction.
-    void preset(int page, bool select_first, const std::string& dialog);
+    void preset(int page, bool select_first, const std::string& dialog, bool relative_paths);
 };
 } // namespace app
