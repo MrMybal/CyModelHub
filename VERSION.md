@@ -2,6 +2,11 @@
 
 [Français](VERSION.fr.md)
 
+## 0.1.2 — Windows sign-in
+
+- Launch in the Windows notification area at sign-in is enabled by default. Turn it off
+  in Settings. Updates preserve your choice.
+
 ## 0.1.1 — Windows installer and updates
 
 - Per-user Windows x64 installer with a Start menu shortcut and uninstaller.

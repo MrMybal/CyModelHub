@@ -534,6 +534,17 @@ LocalResponse local_http(const LocalRequest& request) {
 
 #ifdef _WIN32
 namespace {
+constexpr auto windows_run_key = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+constexpr auto windows_run_name = L"CyModelHub";
+constexpr auto windows_preferences_key = L"Software\\CyModelHub";
+constexpr auto windows_startup_configured = L"StartupConfigured";
+
+bool mark_windows_startup_configured() {
+    constexpr DWORD configured = 1;
+    return RegSetKeyValueW(HKEY_CURRENT_USER, windows_preferences_key, windows_startup_configured,
+                           REG_DWORD, &configured, sizeof(configured)) == ERROR_SUCCESS;
+}
+
 // Quote one argument the way CommandLineToArgvW reads it back.
 std::wstring quoted(const std::wstring& argument) {
     if (!argument.empty() && argument.find_first_of(L" \t\"") == std::wstring::npos) return argument;
@@ -570,6 +581,49 @@ bool register_install_process(InstallProcess process) {
 #else
     (void)process;
     return true;
+#endif
+}
+
+bool starts_at_windows_sign_in() {
+#ifdef _WIN32
+    DWORD size = 0;
+    return RegGetValueW(HKEY_CURRENT_USER, windows_run_key, windows_run_name, RRF_RT_REG_SZ,
+                        nullptr, nullptr, &size) == ERROR_SUCCESS && size > sizeof(wchar_t);
+#else
+    return false;
+#endif
+}
+
+void configure_windows_sign_in_default() {
+#ifdef _WIN32
+    DWORD size = 0;
+    const auto status = RegGetValueW(HKEY_CURRENT_USER, windows_preferences_key, windows_startup_configured,
+                                     RRF_RT_REG_DWORD, nullptr, nullptr, &size);
+    if (status != ERROR_FILE_NOT_FOUND && status != ERROR_PATH_NOT_FOUND) return;
+    if (starts_at_windows_sign_in()) mark_windows_startup_configured();
+    else set_start_at_windows_sign_in(true);
+#endif
+}
+
+bool set_start_at_windows_sign_in(bool enabled) {
+#ifdef _WIN32
+    if (!enabled) {
+        if (!mark_windows_startup_configured()) return false;
+        const auto result = RegDeleteKeyValueW(HKEY_CURRENT_USER, windows_run_key, windows_run_name);
+        return result == ERROR_SUCCESS || result == ERROR_FILE_NOT_FOUND || result == ERROR_PATH_NOT_FOUND;
+    }
+    const auto exe = executable_path();
+    if (!exe.is_absolute()) return false;
+    std::wstring command = L"\"" + exe.native() + L"\" --start-in-tray";
+    if (!environment("CYMODELHUB_DATA").empty())
+        command += L" --data " + quoted(data_path().native());
+    // Windows supports up to 260 characters in a Run command line.
+    if (command.size() > MAX_PATH || !mark_windows_startup_configured()) return false;
+    return RegSetKeyValueW(HKEY_CURRENT_USER, windows_run_key, windows_run_name, REG_SZ,
+        command.c_str(), static_cast<DWORD>((command.size() + 1) * sizeof(wchar_t))) == ERROR_SUCCESS;
+#else
+    (void)enabled;
+    return false;
 #endif
 }
 

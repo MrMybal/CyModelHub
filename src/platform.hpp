@@ -82,6 +82,11 @@ enum class InstallProcess { desktop, service };
 // Windows Setup uses these process-lifetime markers before replacing the application files.
 bool register_install_process(InstallProcess process);
 
+// Current-user Windows sign-in preference for the desktop application.
+void configure_windows_sign_in_default();
+bool starts_at_windows_sign_in();
+bool set_start_at_windows_sign_in(bool enabled);
+
 // Exclusive, process-lifetime lock used to keep a single service per data directory.
 class FileLock {
     std::intptr_t handle_ = -1;

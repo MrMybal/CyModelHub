@@ -2,6 +2,11 @@
 
 [English](VERSION.md)
 
+## 0.1.2 — Démarrage à l’ouverture de session Windows
+
+- Le lancement dans la zone de notification à l’ouverture de session est activé par défaut.
+  Il peut être désactivé dans les Réglages. Les mises à jour conservent votre choix.
+
 ## 0.1.1 — Installateur et mises à jour Windows
 
 - Installateur Windows x64 pour l’utilisateur courant, avec raccourci dans le menu

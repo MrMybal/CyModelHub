@@ -201,6 +201,7 @@ struct Ui::Impl {
     char install_repository[256]{}, install_file[512]{}, install_url[1024]{}, install_sha[80]{},
         install_token[256]{}, subfolder[256]{};
     bool leave_link = true, preset_select = false, capture_relative_paths = false;
+    bool start_at_sign_in = false;
     bool checking_update = false, checked_update = false, starting_update_download = false;
     Json update_release;
     std::string update_job, update_error, update_installer;
@@ -213,6 +214,11 @@ struct Ui::Impl {
         SDL_ShowWindow(window);
         if (SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED) SDL_RestoreWindow(window);
         SDL_RaiseWindow(window);
+    }
+
+    void open_settings() {
+        start_at_sign_in = modelhub::starts_at_windows_sign_in();
+        show_settings = true;
     }
 
     bool enable_tray(SDL_Surface* icon) {
@@ -232,7 +238,7 @@ struct Ui::Impl {
         });
         auto* preferences = entry(T("Settings"), [](void* state, SDL_TrayEntry*) {
             auto* self = static_cast<Impl*>(state);
-            self->show_settings = true;
+            self->open_settings();
             self->show_window();
         });
         auto* quit = entry(T("Quit CyModelHub"), [](void*, SDL_TrayEntry*) {
@@ -369,7 +375,7 @@ struct Ui::Impl {
             cyui::tooltip(T("Download a model from Hugging Face or from an address").c_str());
             ImGui::SameLine();
             cyui::alignRight(ImGui::GetFrameHeight());
-            if (cyui::iconButton(icon::settings, T("Settings").c_str())) show_settings = true;
+            if (cyui::iconButton(icon::settings, T("Settings").c_str())) open_settings();
         }
         cyui::endTopBar();
         if (ImGui::IsKeyPressed(ImGuiKey_F5, false) && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopup))
@@ -1294,6 +1300,13 @@ struct Ui::Impl {
             }
             cyui::endProperties();
         }
+        if (SDL_strcmp(SDL_GetPlatform(), "Windows") == 0) {
+            if (cyui::toggleSwitch(L("Start in the notification area at Windows sign-in").c_str(), &start_at_sign_in) &&
+                !modelhub::set_start_at_windows_sign_in(start_at_sign_in)) {
+                start_at_sign_in = modelhub::starts_at_windows_sign_in();
+                cyui::notify(T("Could not change the Windows startup setting.").c_str(), cyui::Tone::error);
+            }
+        }
         update_controls();
         cyui::space(10.0f);
         cyui::sectionTitle(T("AI assistants (MCP)").c_str());
@@ -1393,7 +1406,7 @@ void Ui::preset(int page, bool select_first, const std::string& dialog, bool rel
     impl_->preset_select = select_first;
     impl_->show_add = dialog == "add";
     impl_->show_install = dialog == "install";
-    impl_->show_settings = dialog == "settings";
+    if (dialog == "settings") impl_->open_settings();
     impl_->capture_relative_paths = relative_paths;
 }
 } // namespace app

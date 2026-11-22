@@ -58,6 +58,10 @@ const
   DesktopMarker = 'Local\CyModelHub.Desktop';
   ServiceMarker = 'Local\CyModelHub.Service';
   InstallationMarker = 'Local\CyModelHub.Installing';
+  WindowsRunKey = 'Software\Microsoft\Windows\CurrentVersion\Run';
+  WindowsRunName = 'CyModelHub';
+  WindowsPreferencesKey = 'Software\CyModelHub';
+  WindowsStartupConfigured = 'StartupConfigured';
   Synchronize = $00100000;
   WaitObject = 0;
 var
@@ -147,10 +151,38 @@ begin
     ReleaseInstallLock();
 end;
 
+function WindowsStartupCommand(): String;
+begin
+  Result := '"' + ExpandConstant('{app}\CyModelHub.exe') + '" --start-in-tray';
+end;
+
+procedure ConfigureWindowsStartup();
+var
+  Command, Profile: String;
+begin
+  if RegValueExists(HKCU, WindowsPreferencesKey, WindowsStartupConfigured) then
+    Exit;
+  if not RegValueExists(HKCU, WindowsRunKey, WindowsRunName) then
+  begin
+    Command := WindowsStartupCommand();
+    Profile := ProfileArguments('');
+    if Profile <> '' then
+      Command := Command + ' ' + Profile;
+    if Length(Command) > 260 then
+      Exit;
+    if not RegWriteStringValue(HKCU, WindowsRunKey, WindowsRunName, Command) then
+      Exit;
+  end;
+  RegWriteDWordValue(HKCU, WindowsPreferencesKey, WindowsStartupConfigured, 1);
+end;
+
 procedure CurStepChanged(Step: TSetupStep);
 begin
   if Step = ssPostInstall then
+  begin
+    ConfigureWindowsStartup();
     ReleaseInstallLock();
+  end;
 end;
 
 procedure DeinitializeSetup();
@@ -164,4 +196,18 @@ begin
   if not Result then
     SuppressibleMsgBox(CustomMessage('WaitForApp') + #13#10 + CustomMessage('WaitForService'),
       mbError, MB_OK, IDOK);
+end;
+
+procedure CurUninstallStepChanged(Step: TUninstallStep);
+var
+  Command, TrayCommand: String;
+begin
+  if Step <> usPostUninstall then
+    Exit;
+  TrayCommand := WindowsStartupCommand();
+  if RegQueryStringValue(HKCU, WindowsRunKey, WindowsRunName, Command) and
+    ((CompareText(Command, TrayCommand) = 0) or
+     (CompareText(Copy(Command, 1, Length(TrayCommand) + 8), TrayCommand + ' --data ') = 0)) then
+    if RegDeleteValue(HKCU, WindowsRunKey, WindowsRunName) then
+      RegDeleteValue(HKCU, WindowsPreferencesKey, WindowsStartupConfigured);
 end;

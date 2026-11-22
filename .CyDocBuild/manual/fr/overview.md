@@ -4,7 +4,7 @@ title: Premiers pas avec CyModelHub
 description: Ouvrez CyModelHub, repérez vos modèles déjà installés et retrouvez le fichier recherché.
 section: CyModelHub
 order: 0
-sourceRevision: 3
+sourceRevision: 4
 # SPDX-License-Identifier: GPL-3.0-only
 ---
 
@@ -21,6 +21,11 @@ Linux et macOS sont des cibles qui restent à compiler et à tester.
 Sous Windows, cliquez sur l’icône CyModelHub près de l’horloge, puis sur **Réglages**.
 La croix masque la fenêtre. Choisissez **Ouvrir CyModelHub** pour la réafficher ou
 **Quitter CyModelHub** pour fermer l’application de bureau.
+
+CyModelHub démarre près de l’horloge par défaut à l’ouverture de votre session Windows.
+Pour désactiver ce comportement, ouvrez les **Réglages** et décochez **Démarrer dans
+la zone de notification à l’ouverture de la session Windows**. Les mises à jour
+conservent votre choix.
 
 Appuyez sur **F1** ou choisissez **Réglages → Manuel utilisateur (F1)** pour ouvrir ce manuel.
 Depuis une copie locale du dépôt ou du dossier installé, vous pouvez aussi ouvrir

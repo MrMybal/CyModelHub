@@ -19,7 +19,7 @@ namespace {
 struct Arguments {
     std::string locale, theme, capture, dialog, data;
     int page = 0;
-    bool select = false, capture_relative_paths = false, help = false;
+    bool select = false, capture_relative_paths = false, start_in_tray = false, help = false;
 };
 
 Arguments parse(int argc, char** argv) {
@@ -35,6 +35,7 @@ Arguments parse(int argc, char** argv) {
         else if (word == "--page") arguments.page = std::atoi(value().c_str());
         else if (word == "--select") arguments.select = true;
         else if (word == "--capture-relative-paths") arguments.capture_relative_paths = true;
+        else if (word == "--start-in-tray") arguments.start_in_tray = true;
         else arguments.help = true;
     }
     return arguments;
@@ -102,16 +103,17 @@ void run(const Arguments& arguments) {
     cyui::loadFonts();
     ImGui_ImplSDL3_InitForSDLRenderer(window.get(), renderer.get());
     ImGui_ImplSDLRenderer3_Init(renderer.get());
-    SDL_ShowWindow(window.get());
 
     {
         app::Data data;
         app::Ui ui(data, settings, window.get(), logo.get());
-        ui.preset(arguments.page, arguments.select, arguments.dialog,
-                  !arguments.capture.empty() && arguments.capture_relative_paths);
         const bool tray = arguments.capture.empty() && icon && SDL_strcmp(SDL_GetPlatform(), "Windows") == 0 &&
                           ui.enable_tray(icon.get());
         icon.reset();
+        if (tray && !arguments.start_in_tray) modelhub::configure_windows_sign_in_default();
+        ui.preset(arguments.page, arguments.select, arguments.dialog,
+                  !arguments.capture.empty() && arguments.capture_relative_paths);
+        if (!arguments.start_in_tray || !tray) SDL_ShowWindow(window.get());
         constexpr auto not_visible = SDL_WINDOW_HIDDEN | SDL_WINDOW_MINIMIZED;
         int frame = 0, settled = 0;
         for (bool running = true; running;) {
@@ -171,7 +173,7 @@ int main(int argc, char** argv) {
     try {
         const auto arguments = parse(argc, argv);
         if (arguments.help) {
-            std::cout << "CyModelHub [--locale CODE] [--theme KEY] [--data PATH]\n"
+            std::cout << "CyModelHub [--locale CODE] [--theme KEY] [--data PATH] [--start-in-tray]\n"
                          "Desktop manager for the AI models shared between applications.\n";
             return 0;
         }

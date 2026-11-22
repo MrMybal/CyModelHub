@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 cmake_minimum_required(VERSION 3.24)
-project(CyModelHub VERSION 0.1.1 LANGUAGES CXX)
+project(CyModelHub VERSION 0.1.2 LANGUAGES CXX)
 
 if(NOT WIN32 AND NOT APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
     message(FATAL_ERROR "CyModelHub targets Windows, Linux and macOS.")

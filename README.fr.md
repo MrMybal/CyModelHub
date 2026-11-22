@@ -15,7 +15,7 @@
     </td>
     <td width="300" align="right" valign="top">
       <p><sub>Licence</sub><br><a href="LICENSE"><strong>GPL-3.0-only</strong></a><br><sub>bibliothèque cliente : <a href="LICENSE-MIT">MIT</a></sub></p>
-      <p><sub>Version</sub><br><a href="VERSION.fr.md"><strong>0.1.1</strong></a><br><strong>EN DÉVELOPPEMENT</strong></p>
+      <p><sub>Version</sub><br><a href="VERSION.fr.md"><strong>0.1.2</strong></a><br><strong>EN DÉVELOPPEMENT</strong></p>
       <p><sub>Plateforme vérifiée</sub><br><a href="https://github.com/MrMybal/CyModelHub/releases/latest">Télécharger pour Windows x64</a></p>
     </td>
   </tr>
@@ -25,7 +25,7 @@
 applications.** Installez un modèle une fois ; chaque programme qui interroge CyModelHub le
 retrouve, au lieu de télécharger et de stocker sa propre copie.
 
-> **EN DÉVELOPPEMENT · 0.1.1** — compilé et testé sous Windows x64. Le code pour Linux et
+> **EN DÉVELOPPEMENT · 0.1.2** — compilé et testé sous Windows x64. Le code pour Linux et
 > macOS est écrit mais n'a pas encore été compilé ni exécuté. Voir les
 > [notes de version](VERSION.fr.md).
 
@@ -184,6 +184,9 @@ avant d’ouvrir l’installateur. À partir de la 0.1.1, ouvrez **Réglages →
 l’application → Vérifier les mises à jour** pour trouver les installateurs récents sur
 GitHub. CyModelHub vérifie le SHA-256 du fichier avant de proposer son installation.
 Les mises à jour conservent le catalogue et les réglages.
+
+À partir de la 0.1.2, CyModelHub démarre par défaut près de l’horloge à l’ouverture
+de votre session Windows. Vous pouvez désactiver ce comportement dans les **Réglages**.
 
 ## Compilation
 
