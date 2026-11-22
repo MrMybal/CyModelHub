@@ -173,6 +173,8 @@ struct Ui::Impl {
     SDL_Window* window;
     SDL_Texture* logo;
     std::shared_ptr<const Snapshot> snap;
+    std::unique_ptr<SDL_Tray, decltype(&SDL_DestroyTray)> tray{nullptr, SDL_DestroyTray};
+    SDL_TrayEntry *tray_open = nullptr, *tray_settings = nullptr, *tray_quit = nullptr;
 
     Filter filter;
     char search[256]{};
@@ -202,6 +204,45 @@ struct Ui::Impl {
 
     Impl(Data& d, Settings& s, SDL_Window* w, SDL_Texture* logo_texture)
         : data(d), settings(s), window(w), logo(logo_texture) {}
+
+    void show_window() {
+        SDL_ShowWindow(window);
+        if (SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED) SDL_RestoreWindow(window);
+        SDL_RaiseWindow(window);
+    }
+
+    bool enable_tray(SDL_Surface* icon) {
+        std::unique_ptr<SDL_Tray, decltype(&SDL_DestroyTray)> badge(
+            SDL_CreateTray(icon, "CyModelHub"), SDL_DestroyTray);
+        if (!badge) return false;
+        auto* menu = SDL_CreateTrayMenu(badge.get());
+        if (!menu) return false;
+
+        const auto entry = [&](const std::string& label, SDL_TrayCallback callback) {
+            auto* item = SDL_InsertTrayEntryAt(menu, -1, label.c_str(), SDL_TRAYENTRY_BUTTON);
+            if (item) SDL_SetTrayEntryCallback(item, callback, this);
+            return item;
+        };
+        auto* open = entry(T("Open CyModelHub"), [](void* state, SDL_TrayEntry*) {
+            static_cast<Impl*>(state)->show_window();
+        });
+        auto* preferences = entry(T("Settings"), [](void* state, SDL_TrayEntry*) {
+            auto* self = static_cast<Impl*>(state);
+            self->show_settings = true;
+            self->show_window();
+        });
+        auto* quit = entry(T("Quit CyModelHub"), [](void*, SDL_TrayEntry*) {
+            SDL_Event event{};
+            event.type = SDL_EVENT_QUIT;
+            SDL_PushEvent(&event);
+        });
+        if (!open || !preferences || !quit) return false;
+        tray_open = open;
+        tray_settings = preferences;
+        tray_quit = quit;
+        tray = std::move(badge);
+        return true;
+    }
 
     void open_manual() {
         const auto directory = modelhub::executable_path().parent_path();
@@ -1102,6 +1143,11 @@ struct Ui::Impl {
             if (cyui::combo("##language", &current, names.data(), static_cast<int>(names.size()), -1.0f)) {
                 settings.locale = locales[static_cast<std::size_t>(current)].code;
                 cyui::setLocale(settings.locale.c_str());
+                if (tray) {
+                    SDL_SetTrayEntryLabel(tray_open, T("Open CyModelHub").c_str());
+                    SDL_SetTrayEntryLabel(tray_settings, T("Settings").c_str());
+                    SDL_SetTrayEntryLabel(tray_quit, T("Quit CyModelHub").c_str());
+                }
                 save_settings(settings);
             }
             cyui::property(T("Theme").c_str());
@@ -1206,6 +1252,7 @@ Ui::Ui(Data& data, Settings& settings, SDL_Window* window, SDL_Texture* logo)
     : impl_(std::make_unique<Impl>(data, settings, window, logo)) {}
 Ui::~Ui() = default;
 void Ui::draw() { impl_->draw(); }
+bool Ui::enable_tray(SDL_Surface* icon) { return impl_->enable_tray(icon); }
 
 bool Ui::animating() const {
     if (!impl_->snap) return true;

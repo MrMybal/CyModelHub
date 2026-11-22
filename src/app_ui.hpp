@@ -5,6 +5,7 @@
 
 #include "app_data.hpp"
 
+struct SDL_Surface;
 struct SDL_Texture;
 struct SDL_Window;
 
@@ -23,6 +24,7 @@ class Ui {
     Ui(Data& data, Settings& settings, SDL_Window* window, SDL_Texture* logo);
     ~Ui();
     void draw();
+    bool enable_tray(SDL_Surface* icon);
     // True while something moves on screen (a job runs), so the host keeps redrawing.
     bool animating() const;
     // Used by --capture to render a given screen without interaction.

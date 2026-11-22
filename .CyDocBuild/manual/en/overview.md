@@ -4,7 +4,7 @@ title: Get started with CyModelHub
 description: Open CyModelHub, discover your installed models and find the file you need.
 section: CyModelHub
 order: 0
-revision: 1
+revision: 2
 # SPDX-License-Identifier: GPL-3.0-only
 ---
 
@@ -17,6 +17,10 @@ once and other applications can ask for its path.
 With a Windows build, keep the installed files together and launch `CyModelHub.exe`.
 The desktop app starts the service as needed. Windows x64 is the verified platform for
 this version. Linux and macOS are targets that have yet to be built or tested.
+
+On Windows, select the CyModelHub icon near the clock and choose **Settings** to open
+the settings directly. The window’s close button hides it. Select **Open CyModelHub**
+to bring it back, or **Quit CyModelHub** to close the desktop app.
 
 Use **F1** or **Settings → User manual (F1)** to open this manual. From a local copy
 of the repository or installed files, you can also open `Documentation/Documentation.html`

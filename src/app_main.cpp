@@ -67,11 +67,11 @@ void run(const Arguments& arguments) {
     if (!renderer) throw std::runtime_error(SDL_GetError());
     SDL_SetRenderVSync(renderer.get(), 1);
 
+    std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> icon(nullptr, SDL_DestroySurface);
     std::unique_ptr<SDL_Texture, decltype(&SDL_DestroyTexture)> logo(nullptr, SDL_DestroyTexture);
     if (const auto* base = SDL_GetBasePath()) {
         const auto icon_path = std::string(base) + "assets/branding/cymodelhub-icon.png";
-        std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> icon(
-            SDL_LoadPNG(icon_path.c_str()), SDL_DestroySurface);
+        icon.reset(SDL_LoadPNG(icon_path.c_str()));
         if (icon) {
             SDL_SetWindowIcon(window.get(), icon.get());
             logo.reset(SDL_CreateTextureFromSurface(renderer.get(), icon.get()));
@@ -108,19 +108,27 @@ void run(const Arguments& arguments) {
         app::Ui ui(data, settings, window.get(), logo.get());
         ui.preset(arguments.page, arguments.select, arguments.dialog,
                   !arguments.capture.empty() && arguments.capture_relative_paths);
+        const bool tray = arguments.capture.empty() && icon && SDL_strcmp(SDL_GetPlatform(), "Windows") == 0 &&
+                          ui.enable_tray(icon.get());
+        icon.reset();
+        constexpr auto not_visible = SDL_WINDOW_HIDDEN | SDL_WINDOW_MINIMIZED;
         int frame = 0, settled = 0;
         for (bool running = true; running;) {
             SDL_Event event{};
             // Redraw at once on input, smoothly while something moves, and rarely when idle.
-            const int wait = !arguments.capture.empty() || ui.animating() || frame < 10 ? 16 : 120;
+            const bool visible = !(SDL_GetWindowFlags(window.get()) & not_visible);
+            const int wait = !arguments.capture.empty() || (visible && (ui.animating() || frame < 10)) ? 16 : 120;
             if (SDL_WaitEventTimeout(&event, wait)) do {
-                    if (event.type == SDL_EVENT_QUIT ||
-                        (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED &&
-                         event.window.windowID == SDL_GetWindowID(window.get())))
+                    if (event.type == SDL_EVENT_QUIT) {
                         running = false;
+                    } else if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED &&
+                               event.window.windowID == SDL_GetWindowID(window.get())) {
+                        if (tray) SDL_HideWindow(window.get());
+                        else running = false;
+                    }
                     ImGui_ImplSDL3_ProcessEvent(&event);
                 } while (SDL_PollEvent(&event));
-            if (SDL_GetWindowFlags(window.get()) & SDL_WINDOW_MINIMIZED) continue;
+            if (!running || (SDL_GetWindowFlags(window.get()) & not_visible)) continue;
             if (const float current = window_dpi(window.get()); current != dpi) {
                 dpi = current;
                 cyui::applyDpi(dpi);

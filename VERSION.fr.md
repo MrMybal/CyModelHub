@@ -41,6 +41,8 @@
 - Vraie reconnaissance des modèles de parole Fermion (`.fermion`) : l'index du conteneur est
   lu et contrôlé par rapport à sa taille, à son manifeste et à sa configuration.
 - Application de bureau construite avec CyUI, en français et en anglais.
+- Icône dans la zone de notification Windows pour rouvrir la fenêtre, accéder aux réglages
+  ou quitter l’application. La croix masque la fenêtre.
 - Manuel CyDoc hors ligne en anglais et en français, accessible depuis les réglages ou avec **F1**.
 - Licences : GPL-3.0-only, sauf la bibliothèque cliente, sous MIT pour que toute application
   puisse la lier.

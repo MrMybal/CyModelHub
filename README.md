@@ -16,7 +16,7 @@
     <td width="300" align="right" valign="top">
       <p><sub>License</sub><br><a href="LICENSE"><strong>GPL-3.0-only</strong></a><br><sub>client library: <a href="LICENSE-MIT">MIT</a></sub></p>
       <p><sub>Version</sub><br><a href="VERSION.md"><strong>0.1.0</strong></a><br><strong>IN DEVELOPMENT</strong></p>
-      <p><sub>Verified platform</sub><br>Windows x64</p>
+      <p><sub>Verified platform</sub><br><a href="https://github.com/MrMybal/CyModelHub/releases/tag/v0.1.0">Windows x64 download</a></p>
     </td>
   </tr>
 </table>
@@ -159,8 +159,10 @@ file next to the others: it appears in **Settings → Language**.
 
 ## Installation
 
-Follow the [Windows build and installation steps](BUILD.md#windows), then run `CyModelHub.exe` in the installed
-folder. The service starts when needed. Press **F1** or choose **Settings → User manual (F1)**
+Download the Windows x64 ZIP from [release 0.1.0](https://github.com/MrMybal/CyModelHub/releases/tag/v0.1.0),
+extract the whole folder and run `CyModelHub.exe`. The service starts when needed. Open
+**Settings** from the CyModelHub icon in the Windows notification area to go straight to the
+settings. Press **F1** or choose **Settings → User manual (F1)**
 to open the bilingual offline manual. You can also open
 [Documentation.html](Documentation/Documentation.html#/en/overview) from a local copy of the
 repository or the installed folder. Keep `DocData` beside the HTML file.

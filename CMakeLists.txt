@@ -155,6 +155,11 @@ if(CYMODELHUB_BUILD_APP)
         FetchContent_Declare(SDL3 GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
             GIT_TAG 683181b47cfabd293e3ea409f838915b8297a4fd)
         FetchContent_MakeAvailable(SDL3)
+        if(MSVC)
+            # Keep SDL assertion diagnostics without embedding the build machine's source path.
+            file(TO_NATIVE_PATH "${sdl3_SOURCE_DIR}" sdl_source_path)
+            target_compile_options(SDL3-static PRIVATE "$<$<COMPILE_LANGUAGE:C,CXX>:/d1trimfile:${sdl_source_path}>")
+        endif()
     endif()
 
     set(sdl_backends "${cyui_SOURCE_DIR}/third_party/imgui-sdl3")

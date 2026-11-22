@@ -33,6 +33,8 @@
 - Real recognition of Fermion speech models (`.fermion`): the container index is read and
   checked against its size, its manifest and its configuration.
 - Desktop application built with CyUI, in English and French.
+- Windows notification area icon to reopen the application, open Settings or quit. Closing
+  the window hides it in the notification area.
 - Offline CyDoc manual in English and French, available from Settings or with **F1**.
 - Licensing: GPL-3.0-only, except the client library, which is MIT so that any application
   may link it.
