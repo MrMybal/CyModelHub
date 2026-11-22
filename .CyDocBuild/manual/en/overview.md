@@ -4,7 +4,7 @@ title: Get started with CyModelHub
 description: Open CyModelHub, discover your installed models and find the file you need.
 section: CyModelHub
 order: 0
-revision: 2
+revision: 3
 # SPDX-License-Identifier: GPL-3.0-only
 ---
 
@@ -25,6 +25,18 @@ to bring it back, or **Quit CyModelHub** to close the desktop app.
 Use **F1** or **Settings → User manual (F1)** to open this manual. From a local copy
 of the repository or installed files, you can also open `Documentation/Documentation.html`
 directly. Keep its `DocData` folder next to it.
+
+## Update the Windows app {#app-updates}
+
+Open **Settings → Application updates → Check for updates**. You can include or skip
+pre-releases. If a newer installer is available, choose **Download update**. After
+CyModelHub verifies the download, choose **Install update** to close the app and open
+the installer. Let running jobs finish first. The installer preserves your catalogue
+and settings.
+
+If you are using the portable 0.1.0 release, quit it from the notification area,
+wait for any jobs to finish, then run `CyModelHubCli stop` before opening the installer
+for the first time.
 
 ## Find your first model {#first-scan}
 

@@ -41,6 +41,7 @@ class Jobs {
     mutable std::mutex mutex_;
     std::list<std::shared_ptr<Entry>> entries_;
     std::uint64_t counter_ = 0;
+    bool quiescing_ = false;
     std::string run_; // makes job IDs differ from one run of the service to the next
 
   public:
@@ -53,6 +54,7 @@ class Jobs {
     // ID of a job of this kind that is still running, or an empty string.
     std::string running(const std::string& kind) const;
     std::size_t running_count() const;
+    bool quiesce_if_idle();
     Json list() const;
     Json get(const std::string& id) const; // throws NotFound
     std::optional<Json> find(const std::string& id) const;

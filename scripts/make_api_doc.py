@@ -78,7 +78,7 @@ def main():
             time.sleep(0.1)
     lines = [HEADER, "| Operation | | Purpose |", "| --- | --- | --- |"]
     jobs = {"models_move", "models_hash", "scan_start", "install_start", "roots_add", "roots_enable",
-            "models_register", "models_verify"}
+            "models_register", "models_verify", "app_updates_download"}
     for operation in operations["operations"]:
         name = operation["name"]
         kind = "read" if operation.get("annotations", {}).get("readOnlyHint") else "job" if name in jobs else "write"

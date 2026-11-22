@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 cmake_minimum_required(VERSION 3.24)
-project(CyModelHub VERSION 0.1.0 LANGUAGES CXX)
+project(CyModelHub VERSION 0.1.1 LANGUAGES CXX)
 
 if(NOT WIN32 AND NOT APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
     message(FATAL_ERROR "CyModelHub targets Windows, Linux and macOS.")
@@ -114,7 +114,7 @@ cymodelhub_configure(cymodelhub_client)
 if(CYMODELHUB_BUILD_SERVICE)
     add_library(modelhub_core STATIC src/model.cpp src/formats.cpp src/scanner.cpp src/catalog.cpp
         src/jobs.cpp src/install.cpp src/files.cpp src/package.cpp src/coordination.cpp src/installs.cpp
-        src/service.cpp src/resident.cpp)
+        src/service.cpp src/resident.cpp src/app_updates.cpp)
     target_link_libraries(modelhub_core PUBLIC CyMCP::MCP modelhub_platform)
     cymodelhub_configure(modelhub_core)
 

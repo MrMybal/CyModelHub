@@ -52,6 +52,18 @@ $cyModelHubCMake = Join-Path $cyModelHubVS 'Common7\IDE\CommonExtensions\Microso
 Lancez `stage/CyModelHub.exe` et ouvrez le manuel avec **F1**.
 Run `stage/CyModelHub.exe` and press **F1** to open the manual.
 
+Pour produire l’installateur Windows x64 localement, installez Inno Setup 6.7 puis lancez
+`./scripts/build_installer.ps1`. L’option `-Compiler` permet d’indiquer le chemin d’`ISCC.exe`.
+
+To build the Windows x64 installer locally, install Inno Setup 6.7 and run
+`./scripts/build_installer.ps1`. Use `-Compiler` to specify the path to `ISCC.exe`.
+
+L’installateur est créé dans `dist/`. Pour que l’application le détecte sur GitHub,
+attachez `CyModelHub-X.Y.Z-windows-x64-setup.exe` à la release `vX.Y.Z`.
+
+The installer is written to `dist/`. For the app to find it on GitHub, attach
+`CyModelHub-X.Y.Z-windows-x64-setup.exe` to release `vX.Y.Z`.
+
 Ou à la main / Or by hand:
 
 ```powershell

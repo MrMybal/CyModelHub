@@ -2,6 +2,13 @@
 
 [English](VERSION.md)
 
+## 0.1.1 — Installateur et mises à jour Windows
+
+- Installateur Windows x64 pour l’utilisateur courant, avec raccourci dans le menu
+  Démarrer et programme de désinstallation.
+- Recherche des versions GitHub depuis les Réglages, avec les préversions en option
+  et vérification du SHA-256 avant le lancement. L’installation attend l’arrêt du service.
+
 ## 0.1.0 — Première version fonctionnelle
 
 **EN DÉVELOPPEMENT.** Compilé et testé sous Windows 10 x64 avec MSVC 19.40.

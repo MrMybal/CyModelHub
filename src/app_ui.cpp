@@ -201,6 +201,10 @@ struct Ui::Impl {
     char install_repository[256]{}, install_file[512]{}, install_url[1024]{}, install_sha[80]{},
         install_token[256]{}, subfolder[256]{};
     bool leave_link = true, preset_select = false, capture_relative_paths = false;
+    bool checking_update = false, checked_update = false, starting_update_download = false;
+    Json update_release;
+    std::string update_job, update_error, update_installer;
+    std::uint64_t update_job_requested = 0;
 
     Impl(Data& d, Settings& s, SDL_Window* w, SDL_Texture* logo_texture)
         : data(d), settings(s), window(w), logo(logo_texture) {}
@@ -1129,6 +1133,126 @@ struct Ui::Impl {
         cyui::endModal();
     }
 
+    Json update_arguments() const {
+        return {{"currentVersion", CYMODELHUB_VERSION}, {"prereleases", settings.update_prereleases}};
+    }
+
+    void install_update() {
+        if (snap->status.value("jobsRunning", std::size_t{0}) > 0) {
+            update_error = T("Wait for running jobs before installing an update.");
+            return;
+        }
+        const auto title = T("Install CyModelHub update");
+        const auto prompt = T("Close CyModelHub and open the Windows installer?");
+        const auto install = T("Install update"), cancel = T("Cancel");
+        const SDL_MessageBoxButtonData buttons[] = {
+            {SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 0, cancel.c_str()},
+            {SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 1, install.c_str()}};
+        const SDL_MessageBoxData dialog{SDL_MESSAGEBOX_INFORMATION, window, title.c_str(),
+            prompt.c_str(), 2, buttons, nullptr};
+        int install_choice = 0;
+        if (!SDL_ShowMessageBox(&dialog, &install_choice) || install_choice != 1) return;
+
+        const auto installer = modelhub::from_utf8(update_installer);
+        if (installer.parent_path() != modelhub::data_path() || installer.extension() != ".exe" ||
+            !modelhub::spawn_detached(installer, {"/CYMODELHUBAPP=" + std::to_string(modelhub::process_id()),
+                "/CYMODELHUBDATA=" + modelhub::to_utf8(modelhub::data_path())})) {
+            update_error = T("Could not start the CyModelHub installer.");
+            return;
+        }
+        SDL_Event event{};
+        event.type = SDL_EVENT_QUIT;
+        SDL_PushEvent(&event);
+    }
+
+    void update_controls() {
+        if (SDL_strcmp(SDL_GetPlatform(), "Windows") != 0) return;
+        cyui::space(10.0f);
+        cyui::sectionTitle(T("Application updates").c_str());
+        const Json* job = nullptr;
+        if (!update_job.empty()) {
+            for (const auto& item : snap->jobs) {
+                if (item.value("id", std::string()) == update_job) {
+                    job = &item;
+                    break;
+                }
+            }
+            if (job && job->value("state", std::string()) != "running") {
+                if (job->value("state", std::string()) == "done") {
+                    update_installer = job->at("result").value("path", std::string());
+                } else {
+                    update_error = T("Could not download and verify the update.");
+                }
+                update_job.clear();
+                job = nullptr;
+            } else if (!snap->connected || (!job && SDL_GetTicks() - update_job_requested > 10000)) {
+                update_job.clear();
+                update_error = T("Could not download and verify the update.");
+                job = nullptr;
+            }
+        }
+        const bool busy = checking_update || starting_update_download || !update_job.empty();
+        {
+            cyui::ScopedDisabled disabled(busy);
+            if (cyui::toggleSwitch(L("Include pre-releases").c_str(), &settings.update_prereleases)) {
+                save_settings(settings);
+                checked_update = false;
+                update_release = Json();
+                update_error.clear();
+                update_installer.clear();
+            }
+            if (cyui::button(L("Check for updates").c_str())) {
+                checking_update = true;
+                checked_update = false;
+                update_release = Json();
+                update_error.clear();
+                update_installer.clear();
+                data.run([args = update_arguments()](cymodelhub::Client& client) {
+                    return client.invoke("app_updates_check", args);
+                }, [this](const Json& result, const std::string& error) {
+                    checking_update = false;
+                    if (!error.empty()) {
+                        update_error = T("Could not check for updates on GitHub.");
+                        return;
+                    }
+                    checked_update = true;
+                    if (result.value("available", false)) update_release = result.at("release");
+                });
+            }
+        }
+        if (checking_update) cyui::textDim("%s", T("Checking GitHub releases...").c_str());
+        if (starting_update_download || !update_job.empty()) {
+            const auto received = job ? job->value("done", std::uint64_t{0}) : 0;
+            const auto total = update_release.value("size", std::uint64_t{0});
+            cyui::textDim("%s  %s / %s", T("Downloading update...").c_str(),
+                          human_size(received).c_str(), human_size(total).c_str());
+        } else if (!update_installer.empty()) {
+            if (cyui::primaryButton(L("Install update").c_str())) install_update();
+        } else if (update_release.is_object()) {
+            cyui::textDim("%s  %s", T("Version available").c_str(),
+                          update_release.value("version", std::string()).c_str());
+            if (update_release.value("prerelease", false))
+                cyui::textFaint("%s", T("Pre-release").c_str());
+            if (cyui::button(L("Download update").c_str())) {
+                auto args = update_arguments();
+                args["tag"] = update_release.at("tag");
+                update_error.clear();
+                starting_update_download = true;
+                data.run([args = std::move(args)](cymodelhub::Client& client) {
+                    return client.invoke("app_updates_download", args);
+                }, [this](const Json& result, const std::string& error) {
+                    starting_update_download = false;
+                    if (error.empty()) update_job = result.value("job", std::string());
+                    update_job_requested = SDL_GetTicks();
+                    if (update_job.empty()) update_error = T("Could not download and verify the update.");
+                });
+            }
+        } else if (checked_update) {
+            cyui::textDim("%s", T("No newer Windows installer found.").c_str());
+        }
+        if (!update_error.empty()) cyui::callout(cyui::Tone::error, update_error.c_str());
+    }
+
     void settings_dialog() {
         if (!cyui::beginModal(L("Settings").c_str(), &show_settings, 560.0f)) return;
         if (cyui::beginProperties("##settings", 150.0f)) {
@@ -1170,6 +1294,7 @@ struct Ui::Impl {
             }
             cyui::endProperties();
         }
+        update_controls();
         cyui::space(10.0f);
         cyui::sectionTitle(T("AI assistants (MCP)").c_str());
         ImGui::PushTextWrapPos(0.0f);
@@ -1188,8 +1313,11 @@ struct Ui::Impl {
                          ImGui::SetClipboardText(result.dump(2).c_str());
                          cyui::notify(T("MCP configuration copied").c_str(), cyui::Tone::success);
                      });
-        cyui::space(6.0f);
-        cyui::textFaint("%s  %s", T("Data folder:").c_str(), snap->status.value("dataDirectory", std::string()).c_str());
+        if (!capture_relative_paths) {
+            cyui::space(6.0f);
+            cyui::textFaint("%s  %s", T("Data folder:").c_str(),
+                           snap->status.value("dataDirectory", std::string()).c_str());
+        }
         cyui::space(6.0f);
         if (cyui::button(L("User manual (F1)").c_str())) open_manual();
         if (cyui::modalButtons("Close", nullptr) != 0) show_settings = false;

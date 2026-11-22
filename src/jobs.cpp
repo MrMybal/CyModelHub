@@ -37,6 +37,7 @@ std::string Jobs::start(std::string kind, std::string title, Work work) {
     std::vector<std::shared_ptr<Entry>> finished;
     {
         std::lock_guard lock(mutex_);
+        if (quiescing_) throw cymcp::Error("ShuttingDown", "CyModelHub is stopping for an update");
         // Forget the oldest finished jobs; their threads have already returned.
         std::size_t done = 0;
         for (const auto& existing : entries_) done += existing->state != "running";
@@ -111,6 +112,14 @@ std::size_t Jobs::running_count() const {
     std::size_t count = 0;
     for (const auto& entry : entries_) count += entry->state == "running";
     return count;
+}
+
+bool Jobs::quiesce_if_idle() {
+    std::lock_guard lock(mutex_);
+    for (const auto& entry : entries_)
+        if (entry->state == "running") return false;
+    quiescing_ = true;
+    return true;
 }
 
 Json Jobs::describe(const Entry& e) {

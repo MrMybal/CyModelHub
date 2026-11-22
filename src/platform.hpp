@@ -78,6 +78,10 @@ bool loopback_port_taken(int port);
 // Start a program that outlives the caller, without a console window.
 bool spawn_detached(const fs::path& executable, const std::vector<std::string>& arguments);
 
+enum class InstallProcess { desktop, service };
+// Windows Setup uses these process-lifetime markers before replacing the application files.
+bool register_install_process(InstallProcess process);
+
 // Exclusive, process-lifetime lock used to keep a single service per data directory.
 class FileLock {
     std::intptr_t handle_ = -1;

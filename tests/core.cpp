@@ -5,9 +5,14 @@
 
 #include "fixtures.hpp"
 
+#include "app_updates.hpp"
 #include "formats.hpp"
 #include "scanner.hpp"
 #include "service.hpp"
+
+#include <cymcp/http.hpp>
+
+#include <latch>
 
 using namespace modelhub;
 using fixtures::check;
@@ -36,9 +41,38 @@ bool fails(const cymcp::Registry& registry, const char* operation, const Json& a
     }
     return false;
 }
+
+void check_app_update_selection() {
+    const std::string installer = "fixture installer";
+    const auto digest = "sha256:" + cymcp::sha256(installer);
+    const auto release = [&](const std::string& version, bool prerelease) {
+        const auto name = "CyModelHub-" + version + "-windows-x64-setup.exe";
+        const auto tag = "v" + version;
+        const Json asset{{"name", name}, {"state", "uploaded"}, {"size", installer.size()}, {"digest", digest},
+                         {"browser_download_url", "https://github.com/MrMybal/CyModelHub/releases/download/" +
+                                                  tag + "/" + name}};
+        return Json{{"tag_name", tag}, {"draft", false}, {"prerelease", prerelease}, {"assets", Json::array({asset})}};
+    };
+    auto draft = release("9.0.0", false);
+    draft["draft"] = true;
+    auto unverified = release("8.0.0", false);
+    unverified["assets"][0]["digest"] = nullptr;
+    auto foreign = release("7.0.0", false);
+    foreign["assets"][0]["browser_download_url"] = "https://example.com/installer.exe";
+    const auto releases = Json::array({release("0.1.10", true), release("0.1.2", false), draft, unverified, foreign});
+    const auto preview = select_app_update(releases, "0.1.1", true);
+    const auto stable = select_app_update(releases, "0.1.1", false);
+    check(preview && preview->version == "0.1.10" && preview->prerelease, "newest numeric app release");
+    check(stable && stable->version == "0.1.2" && !stable->prerelease, "stable app releases only");
+    check(!select_app_update(releases, "0.1.10", true), "skip equal, older and ineligible app releases");
+    check(preview && matches_app_update(installer, *preview) &&
+              !matches_app_update("fixture installeR", *preview) &&
+              !matches_app_update(installer + "!", *preview), "reject a changed installer digest or size");
+}
 } // namespace
 
 int main() {
+    check_app_update_selection();
     const auto root = fixtures::sandbox("core");
     const auto library = root / "library";
 
@@ -182,6 +216,21 @@ int main() {
     check(reloaded.models().size() == before && reloaded.find(lora) && reloaded.find(lora)->notes == "keep",
           "catalogue persisted");
     check(reloaded.roots().size() == hub->catalog.roots().size(), "locations persisted");
+
+    // Updating must neither interrupt a job nor allow one to start after shutdown begins.
+    std::latch finish_job(1);
+    const auto pending = hub->jobs.start("test", "Test guarded shutdown", [&](const Job&) {
+        finish_job.wait();
+        return Json::object();
+    });
+    check(fails(*registry, "hub_shutdown", {{"whenIdle", true}}, "ServiceBusy") && !hub->shutdown,
+          "guarded shutdown preserves running jobs");
+    finish_job.count_down();
+    check(wait(*hub, pending).at("state") == "done", "job finishes before update");
+    check(registry->invoke("hub_shutdown", {{"whenIdle", true}}).at("stopping") == true && hub->shutdown,
+          "guarded shutdown accepts an idle service");
+    check(fails(*registry, "scan_start", Json::object(), "ShuttingDown"),
+          "no job starts once update shutdown begins");
 
     hub.reset();
     std::error_code error;

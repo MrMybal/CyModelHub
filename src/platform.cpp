@@ -557,6 +557,22 @@ std::wstring quoted(const std::wstring& argument) {
 } // namespace
 #endif
 
+bool register_install_process(InstallProcess process) {
+#ifdef _WIN32
+    // Windows closes the marker when this process exits, including after a crash.
+    static const HANDLE marker = CreateMutexW(nullptr, FALSE, process == InstallProcess::desktop
+        ? L"Local\\CyModelHub.Desktop" : L"Local\\CyModelHub.Service");
+    if (!marker) return false;
+    const HANDLE setup = OpenMutexW(SYNCHRONIZE, FALSE, L"Local\\CyModelHub.Installing");
+    if (!setup) return GetLastError() == ERROR_FILE_NOT_FOUND;
+    CloseHandle(setup);
+    return false;
+#else
+    (void)process;
+    return true;
+#endif
+}
+
 bool spawn_detached(const fs::path& executable, const std::vector<std::string>& arguments) {
 #ifdef _WIN32
     std::wstring command = quoted(executable.wstring());

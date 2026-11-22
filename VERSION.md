@@ -2,6 +2,12 @@
 
 [Français](VERSION.fr.md)
 
+## 0.1.1 — Windows installer and updates
+
+- Per-user Windows x64 installer with a Start menu shortcut and uninstaller.
+- Check GitHub Releases from Settings, optionally include pre-releases, and verify an
+  installer’s SHA-256 before running it. Installation waits for a safe service shutdown.
+
 ## 0.1.0 — First working version
 
 **IN DEVELOPMENT.** Built and tested on Windows 10 x64 with MSVC 19.40.

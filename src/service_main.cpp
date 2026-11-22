@@ -38,6 +38,7 @@ int run(const std::vector<std::string>& arguments) {
             return 2;
         }
     }
+    if (!modelhub::register_install_process(modelhub::InstallProcess::service)) return 2;
     const auto data = modelhub::data_path();
     modelhub::fs::create_directories(data);
     cymcp::private_directory(data);

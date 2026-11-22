@@ -9,6 +9,7 @@
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+#include <thread>
 
 namespace {
 using cymodelhub::Json;
@@ -32,7 +33,8 @@ const char* usage =
     "  call <operation> [json]        any operation of the service\n"
     "  operations                     every operation with its JSON schema\n"
     "  mcp-config                     MCP client configuration (HTTP)\n"
-    "  stop                           stop the service\n";
+    "  stop                           stop the service\n"
+    "  stop-for-update                stop an idle service and wait for it to exit\n";
 
 std::string human_size(std::uint64_t bytes) {
     const char* units[] = {"B", "KB", "MB", "GB", "TB"};
@@ -136,10 +138,23 @@ int run(std::vector<std::string> arguments) {
         std::cout << client.invoke(argument(1), args).dump(2) << '\n';
     } else if (command == "operations") std::cout << client.describe().dump(2) << '\n';
     else if (command == "mcp-config") std::cout << client.mcp_configuration().dump(2) << '\n';
-    else if (command == "stop") {
+    else if (command == "stop" || command == "stop-for-update") {
         options.start_service = false;
         cymodelhub::Client running(options);
-        if (running.available()) running.invoke("hub_shutdown");
+        const bool update = command == "stop-for-update";
+        if (running.available())
+            running.invoke("hub_shutdown", update ? Json{{"whenIdle", true}} : Json::object());
+        if (update) {
+            const auto directory = options.data_directory.empty() ? modelhub::data_path() : options.data_directory;
+            const auto lock = directory / "service.lock";
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+            while (modelhub::fs::exists(lock)) {
+                if (modelhub::FileLock stopped(lock); stopped.held()) break;
+                if (std::chrono::steady_clock::now() >= deadline)
+                    throw cymodelhub::Error("ServiceBusy", "The CyModelHub service has not stopped");
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+        }
         std::cout << "stopped\n";
     } else {
         std::cerr << usage;

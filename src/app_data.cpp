@@ -17,13 +17,14 @@ Settings load_settings() {
     settings.locale = json.value("locale", settings.locale);
     settings.theme = json.value("theme", settings.theme);
     settings.comfortable = json.value("comfortable", settings.comfortable);
+    settings.update_prereleases = json.value("updatePrereleases", settings.update_prereleases);
     return settings;
 }
 
 void save_settings(const Settings& settings) {
     try {
         const Json json = {{"locale", settings.locale}, {"theme", settings.theme},
-                           {"comfortable", settings.comfortable}};
+                           {"comfortable", settings.comfortable}, {"updatePrereleases", settings.update_prereleases}};
         modelhub::write_file_atomic(settings_file(), json.dump(2));
     } catch (const std::exception&) {
         // Preferences are a convenience: a read-only data folder must not stop the application.

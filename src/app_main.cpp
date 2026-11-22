@@ -56,6 +56,7 @@ float window_dpi(SDL_Window* window) {
 
 void run(const Arguments& arguments) {
     if (!arguments.data.empty()) modelhub::set_environment("CYMODELHUB_DATA", arguments.data);
+    if (!modelhub::register_install_process(modelhub::InstallProcess::desktop)) return;
     Sdl sdl;
     std::unique_ptr<SDL_Window, decltype(&SDL_DestroyWindow)> window(
         SDL_CreateWindow("CyModelHub", 1360, 840, SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_HIDDEN),

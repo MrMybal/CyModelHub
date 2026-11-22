@@ -5,7 +5,7 @@ This file is for assistants working on the application's documentation. The huma
 ```json
 {
   "application": "CyModelHub",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "entry": "Documentation.html",
   "manifest": "DocData/manifest.json",
   "defaultLocale": "en",

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include "service.hpp"
+#include "app_updates.hpp"
 #include "files.hpp"
 #include "installs.hpp"
 #include "package.hpp"
@@ -133,7 +134,6 @@ std::string Hub::start_scan(const std::string& root_id) {
             scan_pending_.push_back(root_id);
         return scan_job_;
     }
-    scan_active_ = true;
     scan_job_ = jobs.start("scan", "Scan", [this, first = root_id](const Job& job) {
         auto summary = Json::array();
         for (auto next = first;;) {
@@ -148,6 +148,7 @@ std::string Hub::start_scan(const std::string& root_id) {
         }
         return Json{{"scans", std::move(summary)}};
     });
+    scan_active_ = true;
     return scan_job_;
 }
 
@@ -797,8 +798,37 @@ std::shared_ptr<cymcp::Registry> make_registry(std::shared_ptr<Hub> hub) {
          },
          {}});
 
+    const auto current_version = text(32, "Version of the desktop application requesting the update.");
+    const auto previews = boolean("Include numbered prereleases. Defaults to true.");
+    add({"app_updates_check", "Check GitHub for a newer CyModelHub Windows installer with a SHA-256.",
+         object_schema({{"currentVersion", current_version}, {"prereleases", previews}}, {"currentVersion"}),
+         output, true, [](const Json& args, const CallContext& context) {
+             const auto current = string_argument(args, "currentVersion");
+             if (!valid_app_version(current)) throw Error("InvalidArguments", "Invalid CyModelHub version");
+             return check_app_updates(current, args.value("prereleases", true), context.cancellation);
+         }, {}});
+    add({"app_updates_download", "Download and verify a CyModelHub Windows installer from its GitHub release. "
+         "The verified executable is stored in the private service data directory and is never run by the service.",
+         object_schema({{"currentVersion", current_version}, {"prereleases", previews},
+                        {"tag", text(33, "GitHub tag returned by app_updates_check.")}}, {"currentVersion", "tag"}),
+         output, false, [hub](const Json& args, const CallContext&) {
+             const auto current = string_argument(args, "currentVersion");
+             const auto tag = string_argument(args, "tag");
+             if (!valid_app_version(current) || !tag.starts_with('v') ||
+                 !valid_app_version(std::string_view(tag).substr(1)))
+                 throw Error("InvalidArguments", "Invalid CyModelHub version or release tag");
+             const auto prereleases = args.value("prereleases", true);
+             return Json{{"job", hub->jobs.start("app_update", "Download CyModelHub " + tag,
+                 [directory = hub->data_directory, current, tag, prereleases](const Job& job) {
+                     return download_app_update(directory, current, tag, prereleases, job);
+                 })}};
+         }, {}});
+
     add({"hub_shutdown", "Stop the CyModelHub service. Applications start it again when they need it.",
-                   object_schema(Json::object()), output, false, [hub](const Json&, const CallContext&) {
+                   object_schema({{"whenIdle", boolean("Refuse shutdown while a job is running.")}}),
+                   output, false, [hub](const Json& args, const CallContext&) {
+                       if (args.value("whenIdle", false) && !hub->jobs.quiesce_if_idle())
+                           throw Error("ServiceBusy", "Wait for the running jobs before updating CyModelHub");
                        hub->shutdown = true;
                        return Json{{"stopping", true}};
                    }, {}});

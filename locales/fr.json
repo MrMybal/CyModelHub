@@ -177,6 +177,22 @@
     "models": "modèles",
     "optional": "facultatif",
     "portrait, favourite, work": "portrait, favori, travail",
-    "running": "en cours"
+    "running": "en cours",
+    "Application updates": "Mises à jour de l’application",
+    "Check for updates": "Vérifier les mises à jour",
+    "Checking GitHub releases...": "Vérification des versions sur GitHub…",
+    "Close CyModelHub and open the Windows installer?": "Fermer CyModelHub et ouvrir le programme d’installation Windows ?",
+    "Could not check for updates on GitHub.": "Impossible de vérifier les mises à jour sur GitHub.",
+    "Could not download and verify the update.": "Impossible de télécharger et de vérifier la mise à jour.",
+    "Could not start the CyModelHub installer.": "Impossible de lancer le programme d’installation de CyModelHub.",
+    "Download update": "Télécharger la mise à jour",
+    "Downloading update...": "Téléchargement de la mise à jour…",
+    "Include pre-releases": "Inclure les préversions",
+    "Install CyModelHub update": "Installer la mise à jour de CyModelHub",
+    "Install update": "Installer la mise à jour",
+    "No newer Windows installer found.": "Aucun installateur Windows plus récent trouvé.",
+    "Pre-release": "Préversion",
+    "Version available": "Version disponible",
+    "Wait for running jobs before installing an update.": "Attendez la fin des tâches avant d’installer une mise à jour."
   }
 }

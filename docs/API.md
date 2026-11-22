@@ -34,6 +34,8 @@ registers exactly the model it needs with these operations.
 
 | Operation | | Purpose |
 | --- | --- | --- |
+| [`app_updates_check`](#app_updates_check) | read | Check GitHub for a newer CyModelHub Windows installer with a SHA-256. |
+| [`app_updates_download`](#app_updates_download) | job | Download and verify a CyModelHub Windows installer from its GitHub release. |
 | [`hub_shutdown`](#hub_shutdown) | write | Stop the CyModelHub service. |
 | [`hub_status`](#hub_status) | read | CyModelHub service status: version, data folder, model count, running jobs. |
 | [`install_leave`](#install_leave) | write | Stop waiting for an installation, a registration or a verification started or joined with this ticket. |
@@ -62,11 +64,33 @@ registers exactly the model it needs with these operations.
 | [`roots_remove`](#roots_remove) | write | Stop watching a folder added by the user and forget the models found in it. |
 | [`scan_start`](#scan_start) | job | Look for models again in one location, or in all of them. |
 
+## app_updates_check
+
+Check GitHub for a newer CyModelHub Windows installer with a SHA-256.
+
+| Argument | Type | | Description |
+| --- | --- | --- | --- |
+| `currentVersion` | string | required | Version of the desktop application requesting the update. |
+| `prereleases` | boolean |  | Include numbered prereleases. Defaults to true. |
+
+## app_updates_download
+
+Download and verify a CyModelHub Windows installer from its GitHub release. The verified executable is stored in the private service data directory and is never run by the service.
+
+| Argument | Type | | Description |
+| --- | --- | --- | --- |
+| `currentVersion` | string | required | Version of the desktop application requesting the update. |
+| `idempotencyKey` | string |  | Optional. 8 to 128 letters, digits, '.', '_', ':' or '-', chosen at random by the caller and holding no secret. The same key with the same arguments returns the first answer (with "replayed": true) instead of acting again; with other arguments it is refused as IdempotencyConflict. Remembered for 7 days. |
+| `prereleases` | boolean |  | Include numbered prereleases. Defaults to true. |
+| `tag` | string | required | GitHub tag returned by app_updates_check. |
+
 ## hub_shutdown
 
 Stop the CyModelHub service. Applications start it again when they need it.
 
-No arguments.
+| Argument | Type | | Description |
+| --- | --- | --- | --- |
+| `whenIdle` | boolean |  | Refuse shutdown while a job is running. |
 
 ## hub_status
 

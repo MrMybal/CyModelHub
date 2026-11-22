@@ -34,6 +34,7 @@ struct Settings {
     std::string locale; // empty: follow the system
     std::string theme = "mid-grey";
     bool comfortable = true;
+    bool update_prereleases = true;
 };
 Settings load_settings();
 void save_settings(const Settings& settings);

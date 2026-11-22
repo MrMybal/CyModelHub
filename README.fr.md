@@ -15,7 +15,7 @@
     </td>
     <td width="300" align="right" valign="top">
       <p><sub>Licence</sub><br><a href="LICENSE"><strong>GPL-3.0-only</strong></a><br><sub>bibliothèque cliente : <a href="LICENSE-MIT">MIT</a></sub></p>
-      <p><sub>Version</sub><br><a href="VERSION.fr.md"><strong>0.1.0</strong></a><br><strong>EN DÉVELOPPEMENT</strong></p>
+      <p><sub>Version</sub><br><a href="VERSION.fr.md"><strong>0.1.1</strong></a><br><strong>EN DÉVELOPPEMENT</strong></p>
       <p><sub>Plateforme vérifiée</sub><br><a href="https://github.com/MrMybal/CyModelHub/releases/tag/v0.1.0">Télécharger pour Windows x64</a></p>
     </td>
   </tr>
@@ -25,7 +25,7 @@
 applications.** Installez un modèle une fois ; chaque programme qui interroge CyModelHub le
 retrouve, au lieu de télécharger et de stocker sa propre copie.
 
-> **EN DÉVELOPPEMENT · 0.1.0** — compilé et testé sous Windows x64. Le code pour Linux et
+> **EN DÉVELOPPEMENT · 0.1.1** — compilé et testé sous Windows x64. Le code pour Linux et
 > macOS est écrit mais n'a pas encore été compilé ni exécuté. Voir les
 > [notes de version](VERSION.fr.md).
 
@@ -177,6 +177,14 @@ Appuyez sur **F1** ou choisissez
 Vous pouvez aussi ouvrir [Documentation.html](Documentation/Documentation.html#/fr/overview)
 depuis une copie locale du dépôt ou du dossier installé. Laissez `DocData` à côté du fichier HTML.
 
+À partir de la 0.1.1, l’installateur Windows x64 installe CyModelHub pour l’utilisateur
+courant et crée un raccourci dans le menu Démarrer. Si vous utilisez la 0.1.0, quittez-la
+depuis la zone de notification, attendez la fin des tâches et lancez `CyModelHubCli stop`
+avant d’ouvrir l’installateur. À partir de la 0.1.1, ouvrez **Réglages → Mises à jour de
+l’application → Vérifier les mises à jour** pour trouver les installateurs récents sur
+GitHub. CyModelHub vérifie le SHA-256 du fichier avant de proposer son installation.
+Les mises à jour conservent le catalogue et les réglages.
+
 ## Compilation
 
 ```powershell
@@ -217,3 +225,5 @@ La notice du lecteur hors ligne se trouve dans `Documentation/DocData/`.
 | [cpp-httplib](https://github.com/yhirose/cpp-httplib) | [MIT](https://github.com/yhirose/cpp-httplib/blob/master/LICENSE) | Serveur HTTP local du service, via CyMCPSDK |
 | [PicoSHA2](https://github.com/okdshin/PicoSHA2) | [MIT](https://github.com/okdshin/PicoSHA2/blob/master/LICENSE) | Vérification SHA-256 |
 | [CyDoc](https://github.com/MrMybal/CyDoc) | [MIT](Documentation/DocData/CyDoc.LICENSE.txt) | Génération et lecture du manuel hors ligne |
+| [Inno Setup](https://jrsoftware.org/isinfo.php) | [Licence Inno Setup](https://github.com/jrsoftware/issrc/blob/is-6_7_4/license.txt) | Installation et désinstallation sous Windows |
+| Bibliothèques d’exécution Microsoft Visual C++ | [Conditions de redistribution Microsoft](https://learn.microsoft.com/fr-fr/cpp/windows/redistributing-visual-cpp-files?view=msvc-170) | DLL x64 fournies avec l’installateur Windows |

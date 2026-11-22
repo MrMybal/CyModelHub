@@ -15,7 +15,7 @@
     </td>
     <td width="300" align="right" valign="top">
       <p><sub>License</sub><br><a href="LICENSE"><strong>GPL-3.0-only</strong></a><br><sub>client library: <a href="LICENSE-MIT">MIT</a></sub></p>
-      <p><sub>Version</sub><br><a href="VERSION.md"><strong>0.1.0</strong></a><br><strong>IN DEVELOPMENT</strong></p>
+      <p><sub>Version</sub><br><a href="VERSION.md"><strong>0.1.1</strong></a><br><strong>IN DEVELOPMENT</strong></p>
       <p><sub>Verified platform</sub><br><a href="https://github.com/MrMybal/CyModelHub/releases/tag/v0.1.0">Windows x64 download</a></p>
     </td>
   </tr>
@@ -25,7 +25,7 @@
 Install a model once; every program that asks CyModelHub finds it, instead of downloading
 and storing its own copy.
 
-> **IN DEVELOPMENT · 0.1.0** — built and tested on Windows x64. The Linux and macOS code paths
+> **IN DEVELOPMENT · 0.1.1** — built and tested on Windows x64. The Linux and macOS code paths
 > are written but have not been compiled or run yet. See the [release notes](VERSION.md).
 
 [![The model list with categories, and the record of the selected model](docs/screenshots/models.png)](docs/screenshots/models.png)
@@ -167,6 +167,13 @@ to open the bilingual offline manual. You can also open
 [Documentation.html](Documentation/Documentation.html#/en/overview) from a local copy of the
 repository or the installed folder. Keep `DocData` beside the HTML file.
 
+Starting with 0.1.1, the Windows x64 installer installs CyModelHub for the current user
+and creates a Start menu shortcut. If you are using 0.1.0, quit it from the notification
+area and run `CyModelHubCli stop` after any jobs finish, then run the installer.
+In 0.1.1 or later, open **Settings → Application updates → Check for updates** to find
+newer installers on GitHub. CyModelHub checks the download against GitHub’s SHA-256
+digest before offering to run it. Updates preserve your catalogue and settings.
+
 ## Build
 
 ```powershell
@@ -206,3 +213,5 @@ its own notice in `Documentation/DocData/`.
 | [cpp-httplib](https://github.com/yhirose/cpp-httplib) | [MIT](https://github.com/yhirose/cpp-httplib/blob/master/LICENSE) | Local HTTP server of the service, via CyMCPSDK |
 | [PicoSHA2](https://github.com/okdshin/PicoSHA2) | [MIT](https://github.com/okdshin/PicoSHA2/blob/master/LICENSE) | SHA-256 verification |
 | [CyDoc](https://github.com/MrMybal/CyDoc) | [MIT](Documentation/DocData/CyDoc.LICENSE.txt) | Offline documentation generator and reader |
+| [Inno Setup](https://jrsoftware.org/isinfo.php) | [Inno Setup license](https://github.com/jrsoftware/issrc/blob/is-6_7_4/license.txt) | Windows installer and uninstaller |
+| Microsoft Visual C++ Runtime | [Microsoft redistribution terms](https://learn.microsoft.com/en-us/cpp/windows/redistributing-visual-cpp-files?view=msvc-170) | x64 runtime DLLs shipped with the Windows installer |
