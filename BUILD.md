@@ -1,11 +1,11 @@
 # Compiler CyModelHub / Build CyModelHub
 
-Git, CMake 3.24 ou plus récent et un compilateur C++20 sont nécessaires ; Python 3 pour le
-test d'installation et les scripts. CMake récupère les versions épinglées de CyMCPSDK, de
+Git, CMake 3.24 ou plus récent et un compilateur C++20 sont nécessaires ; Python 3 pour deux
+des tests et les scripts. CMake récupère les versions épinglées de CyMCPSDK, de
 CyUI et de SDL3.
 
-Git, CMake 3.24 or newer and a C++20 compiler are required; Python 3 for the installation
-test and the scripts. CMake fetches the pinned versions of CyMCPSDK, CyUI and SDL3.
+Git, CMake 3.24 or newer and a C++20 compiler are required; Python 3 for two of the tests
+and the scripts. CMake fetches the pinned versions of CyMCPSDK, CyUI and SDL3.
 
 Pour compiler sans réseau, indiquez des copies locales / To build offline, point at local
 checkouts: `-DFETCHCONTENT_SOURCE_DIR_CYMCPSDK=...`, `-DFETCHCONTENT_SOURCE_DIR_CYUI=...`,
@@ -17,8 +17,13 @@ checkouts: `-DFETCHCONTENT_SOURCE_DIR_CYMCPSDK=...`, `-DFETCHCONTENT_SOURCE_DIR_
 | `CYMODELHUB_BUILD_APP` | ON | Application de bureau / desktop application (CyUI, SDL3) |
 | `CYMODELHUB_BUILD_TESTS` | ON | Tests |
 
-Intégré par `add_subdirectory`, seul le client `CyModelHub::Client` est compilé.
-Embedded with `add_subdirectory`, only the `CyModelHub::Client` library is built.
+Intégré par `add_subdirectory`, seul le client `CyModelHub::Client` est compilé : il ne
+télécharge rien et ne dépend d'aucun autre projet (bibliothèque standard, système, et la copie
+de nlohmann/json dans `third_party`).
+
+Embedded with `add_subdirectory`, only the `CyModelHub::Client` library is built: it downloads
+nothing and depends on no other project (standard library, operating system, and the copy of
+nlohmann/json in `third_party`).
 
 ### Windows
 
@@ -93,6 +98,7 @@ ctest --test-dir build --output-on-failure --no-tests=error
 | --- | --- |
 | `core` | Détection des formats, analyse, catalogue et opérations, dans un seul processus. / Format detection, scanning, catalogue and operations, in one process. |
 | `client` | Bout en bout : la bibliothèque démarre le vrai service ; API, MCP HTTP et relais MCP stdio. / End to end: the library starts the real service; API, MCP over HTTP and the MCP stdio relay. |
+| `http` | L'échange HTTP du client contre un serveur local : longueur annoncée, réponse découpée, tronquée ou lente, limite de taille. / The client's HTTP exchange against a local server: announced length, chunked, truncated or slow answers, size limit. |
 | `download` | Installation contre un serveur HTTP local (redirection, reprise, SHA-256). Aucun accès Internet. / Installation against a local HTTP server (redirect, resume, SHA-256). No Internet access. |
 
 Les tests redirigent tous les dépôts de modèles connus vers un dossier temporaire : ils ne

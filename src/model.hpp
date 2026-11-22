@@ -4,6 +4,7 @@
 #pragma once
 
 #include "platform.hpp"
+#include <cymcp/core.hpp>
 
 namespace modelhub {
 // Classification vocabulary. Values are open strings so a user or a newer scanner can add more.

@@ -211,6 +211,8 @@ std::shared_ptr<cymcp::Registry> make_registry(std::shared_ptr<Hub> hub) {
                 return handler(args, context);
             } catch (const Error&) {
                 throw;
+            } catch (const Failure& failure) {
+                throw Error(failure.code, system_text(failure.what()));
             } catch (const Json::exception& error) {
                 throw Error("InvalidArguments", error.what());
             } catch (const std::exception& error) {

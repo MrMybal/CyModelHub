@@ -20,6 +20,9 @@
 - Installation depuis Hugging Face ou une adresse HTTPS, avec reprise et vérification du
   SHA-256.
 - Bibliothèque cliente C++, outil en ligne de commande, MCP en HTTP et relais MCP stdio.
+- La bibliothèque cliente est autonome : bibliothèque standard C++, système d'exploitation et
+  une copie de nlohmann/json fournie avec le dépôt. L'intégrer dans une application ne
+  télécharge rien.
 - Application de bureau construite avec CyUI, en français et en anglais.
 - Manuel CyDoc hors ligne en anglais et en français, accessible depuis les réglages ou avec **F1**.
 - Licences : GPL-3.0-only, sauf la bibliothèque cliente, sous MIT pour que toute application

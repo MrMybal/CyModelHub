@@ -4,7 +4,6 @@
 #include <cymodelhub/client.hpp>
 
 #include "platform.hpp"
-#include <cymcp/http.hpp>
 #include <mutex>
 #include <thread>
 
@@ -51,33 +50,39 @@ struct Client::Impl {
     Options options;
     std::mutex mutex;
     std::string url, token;
+    int port = 0;
 
     fs::path data_directory() const {
         return options.data_directory.empty() ? modelhub::data_path() : options.data_directory;
     }
 
     // Read <data>/service.json. False when the service is not announced as running.
-    bool read_descriptor(std::string& found_url, std::string& found_token, fs::path& executable) const {
+    bool read_descriptor(int& found_port, std::string& found_token, fs::path& executable) const {
         const auto content = modelhub::read_file(data_directory() / "service.json", 65536);
         const auto json = content ? Json::parse(*content, nullptr, false) : Json();
         if (!json.is_object()) return false;
         executable = modelhub::from_utf8(text(json, "executable"));
         found_token = text(json, "token");
-        const auto port = json.value("port", 0);
-        if (port <= 0 || port > 65535 || found_token.size() < 32) return false;
-        found_url = "http://127.0.0.1:" + std::to_string(port);
-        return true;
+        found_port = json.value("port", 0);
+        return found_port > 0 && found_port <= 65535 && found_token.size() >= 32;
     }
 
-    static bool healthy(const std::string& address) {
+    static bool healthy(int service_port) {
         try {
-            cymcp::HttpRequest request;
-            request.url = address + "/health";
+            modelhub::LocalRequest request;
+            request.port = service_port;
+            request.path = "/health";
             request.timeout = std::chrono::milliseconds(2000);
-            return cymcp::HttpClient().perform(request).status == 200;
+            return modelhub::local_http(request).status == 200;
         } catch (const std::exception&) {
             return false;
         }
+    }
+
+    void use(int service_port, std::string service_token) {
+        port = service_port;
+        token = std::move(service_token);
+        url = "http://127.0.0.1:" + std::to_string(port);
     }
 
     fs::path service_executable(const fs::path& recorded) const {
@@ -97,13 +102,11 @@ struct Client::Impl {
 
     // Caller holds the mutex.
     void connect() {
-        std::string found_url, found_token;
+        int found_port = 0;
+        std::string found_token;
         fs::path recorded;
-        if (read_descriptor(found_url, found_token, recorded) && healthy(found_url)) {
-            url = std::move(found_url);
-            token = std::move(found_token);
-            return;
-        }
+        if (read_descriptor(found_port, found_token, recorded) && healthy(found_port))
+            return use(found_port, std::move(found_token));
         url.clear();
         if (!options.start_service)
             throw Error("ServiceUnavailable", "The CyModelHub service is not running");
@@ -119,11 +122,8 @@ struct Client::Impl {
         const auto deadline = std::chrono::steady_clock::now() + options.start_timeout;
         while (std::chrono::steady_clock::now() < deadline) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            if (read_descriptor(found_url, found_token, recorded) && healthy(found_url)) {
-                url = std::move(found_url);
-                token = std::move(found_token);
-                return;
-            }
+            if (read_descriptor(found_port, found_token, recorded) && healthy(found_port))
+                return use(found_port, std::move(found_token));
         }
         throw Error("ServiceUnavailable", "The CyModelHub service did not answer in time");
     }
@@ -131,25 +131,22 @@ struct Client::Impl {
     Json post(const Json& body) {
         // A restarted service changes its address or token: reconnect once, then give up.
         for (int attempt = 0;; ++attempt) {
-            std::string address, credential;
+            modelhub::LocalRequest request;
             {
                 std::lock_guard lock(mutex);
                 if (url.empty()) connect();
-                address = url;
-                credential = token;
+                request.port = port;
+                request.bearer = token;
             }
-            cymcp::HttpRequest request;
             request.method = "POST";
-            request.url = address + "/v1";
+            request.path = "/v1";
             request.body = body.dump(-1, ' ', false, Json::error_handler_t::replace);
-            request.headers["Content-Type"] = "application/json";
-            request.headers["Authorization"] = "Bearer " + credential;
             request.timeout = options.request_timeout;
             request.max_response_bytes = std::size_t{256} * 1024 * 1024;
-            cymcp::HttpResponse response;
+            modelhub::LocalResponse response;
             try {
-                response = cymcp::HttpClient().perform(request);
-            } catch (const cymcp::Error& error) {
+                response = modelhub::local_http(request);
+            } catch (const modelhub::Failure& error) {
                 if (attempt == 0 && (error.code == "NetworkError" || error.code == "Timeout")) {
                     std::lock_guard lock(mutex);
                     url.clear();
@@ -183,7 +180,7 @@ Client& Client::operator=(Client&&) noexcept = default;
 
 void Client::connect() {
     std::lock_guard lock(impl_->mutex);
-    if (impl_->url.empty() || !Impl::healthy(impl_->url)) impl_->connect();
+    if (impl_->url.empty() || !Impl::healthy(impl_->port)) impl_->connect();
 }
 
 bool Client::available() noexcept {

@@ -17,6 +17,8 @@
 - Move a model (also across drives), hard and symbolic links into other folders.
 - Installation from Hugging Face or an HTTPS address, with resume and SHA-256 verification.
 - C++ client library, command line tool, MCP over HTTP and an MCP stdio relay.
+- The client library is self-contained: the C++ standard library, the operating system and a
+  bundled copy of nlohmann/json. Embedding it in an application downloads nothing.
 - Desktop application built with CyUI, in English and French.
 - Offline CyDoc manual in English and French, available from Settings or with **F1**.
 - Licensing: GPL-3.0-only, except the client library, which is MIT so that any application

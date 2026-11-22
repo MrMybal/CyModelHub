@@ -14,7 +14,7 @@
 
 namespace fixtures {
 namespace fs = std::filesystem;
-using cymcp::Json;
+using modelhub::Json;
 
 inline int failures = 0;
 

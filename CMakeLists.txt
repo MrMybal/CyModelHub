@@ -34,21 +34,45 @@ if(APPLE)
     unset(CMAKE_REQUIRED_FLAGS)
 endif()
 
-# Pinned dependencies. Point FETCHCONTENT_SOURCE_DIR_CYMCPSDK, _CYUI or _SDL3 at an existing
-# checkout to build without network access.
-if(NOT TARGET CyMCP::Http)
-    set(CYMCP_BUILD_HTTP ON CACHE BOOL "" FORCE)
-    set(CYMCP_BUILD_PLATFORM ${CYMODELHUB_BUILD_SERVICE} CACHE BOOL "" FORCE)
-    set(CYMCP_BUILD_MCP ${CYMODELHUB_BUILD_SERVICE} CACHE BOOL "" FORCE)
-    set(CYMCP_BUILD_AI OFF CACHE BOOL "" FORCE)
-    set(CYMCP_BUILD_LOCAL OFF CACHE BOOL "" FORCE)
-    set(CYMCP_BUILD_CHAT_UI OFF CACHE BOOL "" FORCE)
-    set(CYMCP_BUILD_CHAT_APP OFF CACHE BOOL "" FORCE)
-    set(CYMCP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-    set(CYMCP_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-    FetchContent_Declare(CyMCPSDK GIT_REPOSITORY https://github.com/MrMybal/CyMCPSDK.git
-        GIT_TAG e562c731a146d599e3404718ea8414bb5b96b66d)
-    FetchContent_MakeAvailable(CyMCPSDK)
+# JSON for the client library, whose public header uses nlohmann/json. A host project that
+# already defines nlohmann_json::nlohmann_json before adding this directory keeps its own
+# copy; otherwise the one in third_party is used. Nothing is downloaded for the client.
+add_library(cymodelhub_json INTERFACE)
+if(TARGET nlohmann_json::nlohmann_json)
+    target_link_libraries(cymodelhub_json INTERFACE nlohmann_json::nlohmann_json)
+else()
+    target_include_directories(cymodelhub_json SYSTEM INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/third_party")
+endif()
+find_package(Threads REQUIRED)
+
+# Pinned dependencies of the service and the application. Point FETCHCONTENT_SOURCE_DIR_CYMCPSDK,
+# _CYUI or _SDL3 at an existing checkout to build without network access.
+if(CYMODELHUB_BUILD_SERVICE)
+    if(NOT TARGET CyMCP::MCP)
+        set(CYMCP_BUILD_HTTP ON CACHE BOOL "" FORCE)
+        set(CYMCP_BUILD_PLATFORM ON CACHE BOOL "" FORCE)
+        set(CYMCP_BUILD_MCP ON CACHE BOOL "" FORCE)
+        set(CYMCP_BUILD_AI OFF CACHE BOOL "" FORCE)
+        set(CYMCP_BUILD_LOCAL OFF CACHE BOOL "" FORCE)
+        set(CYMCP_BUILD_CHAT_UI OFF CACHE BOOL "" FORCE)
+        set(CYMCP_BUILD_CHAT_APP OFF CACHE BOOL "" FORCE)
+        set(CYMCP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+        set(CYMCP_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+        FetchContent_Declare(CyMCPSDK GIT_REPOSITORY https://github.com/MrMybal/CyMCPSDK.git
+            GIT_TAG e562c731a146d599e3404718ea8414bb5b96b66d)
+        FetchContent_MakeAvailable(CyMCPSDK)
+    endif()
+    # The service passes JSON values between this project and CyMCPSDK: both copies of
+    # nlohmann/json must be the same release.
+    if(DEFINED cymcpsdk_SOURCE_DIR AND NOT TARGET nlohmann_json::nlohmann_json)
+        set(json_version "#define NLOHMANN_JSON_VERSION_(MAJOR|MINOR|PATCH) +[0-9]+")
+        file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/nlohmann/json.hpp" own_json REGEX "${json_version}")
+        file(STRINGS "${cymcpsdk_SOURCE_DIR}/third_party/nlohmann/json.hpp" sdk_json REGEX "${json_version}")
+        if(NOT own_json STREQUAL sdk_json)
+            message(FATAL_ERROR "third_party/nlohmann/json.hpp and the copy shipped with CyMCPSDK are "
+                "different releases. Update third_party/nlohmann together with the CyMCPSDK pin.")
+        endif()
+    endif()
 endif()
 
 function(cymodelhub_configure target)
@@ -66,13 +90,15 @@ function(cymodelhub_configure target)
 endfunction()
 
 # Licensing: the client library and everything compiled into it (include/cymodelhub/client.hpp,
-# src/client.cpp, src/platform.*) are MIT, like this file, so any application may link them.
-# The service, the application, the CLI and the MCP relay are GPL-3.0-only. Keep GPL sources
-# out of the two targets below.
+# src/client.cpp, src/platform.*, third_party/nlohmann) are MIT, like this file, so any
+# application may link them. The service, the application, the CLI and the MCP relay are
+# GPL-3.0-only. Keep GPL sources out of the two targets below, and keep them self-contained:
+# the C++ standard library, the operating system and nlohmann/json, nothing else.
 
-# Paths, private files and process helpers shared by the client and the service.
+# Paths, private files, the local HTTP exchange and process helpers shared by the client and
+# the service.
 add_library(modelhub_platform STATIC src/platform.cpp)
-target_link_libraries(modelhub_platform PUBLIC CyMCP::Core)
+target_link_libraries(modelhub_platform PUBLIC cymodelhub_json Threads::Threads)
 if(WIN32)
     target_link_libraries(modelhub_platform PRIVATE shell32 advapi32 ws2_32)
 endif()
@@ -82,7 +108,7 @@ cymodelhub_configure(modelhub_platform)
 add_library(cymodelhub_client STATIC src/client.cpp)
 add_library(CyModelHub::Client ALIAS cymodelhub_client)
 target_include_directories(cymodelhub_client PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_link_libraries(cymodelhub_client PUBLIC CyMCP::Core PRIVATE CyMCP::Http modelhub_platform)
+target_link_libraries(cymodelhub_client PUBLIC cymodelhub_json PRIVATE modelhub_platform)
 cymodelhub_configure(cymodelhub_client)
 
 if(CYMODELHUB_BUILD_SERVICE)
@@ -169,7 +195,7 @@ if(CYMODELHUB_BUILD_APP)
             "$<TARGET_FILE_DIR:CyModelHub>/licenses/JetBrains-Mono.txt"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different "${cymcpsdk_SOURCE_DIR}/LICENSE"
             "$<TARGET_FILE_DIR:CyModelHub>/licenses/CyMCPSDK.txt"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${cymcpsdk_SOURCE_DIR}/third_party/nlohmann/LICENSE.MIT"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/third_party/nlohmann/LICENSE.MIT"
             "$<TARGET_FILE_DIR:CyModelHub>/licenses/nlohmann-json.txt"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different "${cymcpsdk_SOURCE_DIR}/third_party/httplib/LICENSE"
             "$<TARGET_FILE_DIR:CyModelHub>/licenses/cpp-httplib.txt"
@@ -210,9 +236,17 @@ if(CYMODELHUB_BUILD_TESTS)
             "$<TARGET_FILE:CyModelHubMcp>")
         set_tests_properties(client PROPERTIES TIMEOUT 120)
 
-        # Installation against a local HTTP server; skipped when Python is not available.
+        # The client's HTTP exchange and the installation, each against a local HTTP server;
+        # skipped when Python is not available.
+        add_executable(modelhub_http_probe tests/http_probe.cpp)
+        target_link_libraries(modelhub_http_probe PRIVATE modelhub_platform)
+        target_include_directories(modelhub_http_probe PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+        cymodelhub_configure(modelhub_http_probe)
         find_package(Python3 QUIET COMPONENTS Interpreter)
         if(Python3_Interpreter_FOUND)
+            add_test(NAME http COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/local_http.py"
+                "$<TARGET_FILE:modelhub_http_probe>")
+            set_tests_properties(http PROPERTIES TIMEOUT 120)
             add_test(NAME download COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/download.py"
                 "$<TARGET_FILE:CyModelHubCli>" "$<TARGET_FILE:CyModelHubService>")
             set_tests_properties(download PROPERTIES TIMEOUT 180)

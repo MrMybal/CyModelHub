@@ -4,6 +4,7 @@
 #pragma once
 
 #include "platform.hpp"
+#include <cymcp/core.hpp>
 #include <list>
 
 namespace modelhub {

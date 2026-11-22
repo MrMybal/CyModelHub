@@ -10,10 +10,14 @@ MCP access. Read `README.md` first, then `BUILD.md`.
 - The service owns the catalogue. The application, the CLI and the MCP relay only go through
   `CyModelHub::Client`; add a feature as a service operation in `src/service.cpp` first.
 - Two licenses. The client library is MIT (`include/cymodelhub/client.hpp`, `src/client.cpp`,
-  `src/platform.*`, `CMakeLists.txt`, `examples/client`); everything else is GPL-3.0-only.
-  The targets `cymodelhub_client` and `modelhub_platform` must never compile or include a GPL
-  source: shared code needed by the client goes into `src/platform.*`. Give each new file the
-  matching SPDX line.
+  `src/platform.*`, `CMakeLists.txt`, `examples/client`, `third_party/nlohmann`); everything
+  else is GPL-3.0-only. The targets `cymodelhub_client` and `modelhub_platform` must never
+  compile or include a GPL source: shared code needed by the client goes into
+  `src/platform.*`. Give each new file the matching SPDX line.
+- The client library is self-contained. Those two targets use the C++ standard library, the
+  operating system and `third_party/nlohmann/json.hpp` only: no CyMCPSDK, no other download.
+  CyMCPSDK is for the service, the MCP relay and the tests. `third_party/nlohmann` must stay
+  the same release as the copy in the pinned CyMCPSDK (CMake checks it).
 - After changing an operation: `python scripts/make_api_doc.py build/release/CyModelHubCli.exe`.
 - Safety rules that must hold: never delete a model file; write only inside registered
   locations (`destination()` in `src/service.cpp`); never unpickle or load weights; the token

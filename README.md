@@ -81,9 +81,12 @@ loras.architecture = "sdxl";
 for (const auto& lora : hub.list(loras)) show(lora.name, lora.path);
 ```
 
-The library is MIT-licensed, needs C++20 and pulls
-[CyMCPSDK](https://github.com/MrMybal/CyMCPSDK) (MIT) for JSON and HTTP. A complete example is in [examples/client](examples/client). The service is
-found through `CYMODELHUB_SERVICE`, next to your program, or where it last ran.
+The library is MIT-licensed, needs C++20 and is self-contained: it uses the C++ standard
+library, the operating system and the copy of [nlohmann/json](https://github.com/nlohmann/json)
+(MIT) in `third_party`. Adding it to your project downloads nothing. If your project already
+defines the `nlohmann_json::nlohmann_json` target before it adds CyModelHub, that copy is used
+instead. A complete example is in [examples/client](examples/client). The service is found
+through `CYMODELHUB_SERVICE`, next to your program, or where it last ran.
 
 Any language can talk to the service directly: read `service.json` in the CyModelHub data
 folder (`url`, `token`), then `POST <url>/v1` with `Authorization: Bearer <token>` and
@@ -148,8 +151,8 @@ Copyright (c) 2026 Cyberalien.
 - **The client library** — `include/cymodelhub/client.hpp`, `src/client.cpp`, `src/platform.*`,
   the root `CMakeLists.txt` and `examples/client` — is licensed under [MIT](LICENSE-MIT). Any
   application, open or closed, may link it under the MIT terms; it reaches the service as a
-  separate program, over local HTTP. Keep the copyright and permission notice with your
-  distribution.
+  separate program, over local HTTP. It includes nlohmann/json (`third_party/nlohmann`, MIT).
+  Keep both copyright and permission notices with your distribution.
 
 ### Third-party components
 
@@ -162,8 +165,8 @@ its own notice in `Documentation/DocData/`.
 | [Dear ImGui](https://github.com/ocornut/imgui) | [MIT](https://github.com/ocornut/imgui/blob/master/LICENSE.txt) | Immediate-mode UI and SDL3 backends |
 | [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) | [OFL-1.1](https://github.com/JetBrains/JetBrainsMono/blob/master/OFL.txt) | Monospaced font supplied by CyUI |
 | [SDL3](https://github.com/libsdl-org/SDL) | [Zlib](https://github.com/libsdl-org/SDL/blob/683181b47cfabd293e3ea409f838915b8297a4fd/LICENSE.txt) | Desktop window, input and rendering |
-| [CyMCPSDK](https://github.com/MrMybal/CyMCPSDK) | [MIT](https://github.com/MrMybal/CyMCPSDK/blob/e562c731a146d599e3404718ea8414bb5b96b66d/LICENSE) | Local HTTP, JSON, and MCP transport |
-| [nlohmann/json](https://github.com/nlohmann/json) | [MIT](https://github.com/nlohmann/json/blob/v3.12.0/LICENSE.MIT) | JSON types and serialization via CyMCPSDK |
-| [cpp-httplib](https://github.com/yhirose/cpp-httplib) | [MIT](https://github.com/yhirose/cpp-httplib/blob/master/LICENSE) | Local HTTP client and server via CyMCPSDK |
+| [CyMCPSDK](https://github.com/MrMybal/CyMCPSDK) | [MIT](https://github.com/MrMybal/CyMCPSDK/blob/e562c731a146d599e3404718ea8414bb5b96b66d/LICENSE) | Local HTTP server, downloads and MCP transport of the service |
+| [nlohmann/json](https://github.com/nlohmann/json) | [MIT](third_party/nlohmann/LICENSE.MIT) | JSON types and serialization; copy in `third_party/nlohmann` |
+| [cpp-httplib](https://github.com/yhirose/cpp-httplib) | [MIT](https://github.com/yhirose/cpp-httplib/blob/master/LICENSE) | Local HTTP server of the service, via CyMCPSDK |
 | [PicoSHA2](https://github.com/okdshin/PicoSHA2) | [MIT](https://github.com/okdshin/PicoSHA2/blob/master/LICENSE) | SHA-256 verification |
 | [CyDoc](https://github.com/MrMybal/CyDoc) | [MIT](Documentation/DocData/CyDoc.LICENSE.txt) | Offline documentation generator and reader |
